@@ -14,7 +14,7 @@ import (
 	"github.com/tcdw/opencode-profile/internal/store"
 )
 
-const Version = "0.1.0"
+var Version = "dev"
 
 func Init(l paths.Layout) error {
 	s, err := store.Open(l)
