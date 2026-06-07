@@ -20,10 +20,15 @@ jobs:
         with:
           go-version: stable
 
+      - name: Extract release notes
+        uses: ffurrer2/extract-release-notes@v3
+        with:
+          release_notes_file: RELEASE_NOTES.md
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          args: release --clean --release-notes=RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

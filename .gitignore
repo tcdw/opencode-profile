@@ -1,3 +1,5 @@
 /ocp
 /opencode-profile
 *.out
+/dist
+/RELEASE_NOTES.md

@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"syscall"
 
 	"github.com/tcdw/opencode-profile/internal/cli"
 	"github.com/tcdw/opencode-profile/internal/launch"
@@ -29,8 +28,10 @@ func main() {
 	}
 
 	// The terminal is in a clean state here (Bubble Tea restores it before
-	// Run() returns), so opencode initializes its own TUI from scratch.
-	if err := syscall.Exec(plan.Bin, plan.Argv, plan.Env); err != nil {
+	// Run() returns), so opencode initializes its own TUI from scratch. On unix
+	// this replaces the ocp process; on Windows it runs opencode as a child and
+	// exits with its status.
+	if err := launch.Exec(plan); err != nil {
 		fmt.Fprintf(os.Stderr, "ocp: exec %s: %v\n", plan.Bin, err)
 		os.Exit(127)
 	}
@@ -58,6 +59,10 @@ func dispatch(args []string, l paths.Layout) (*launch.Plan, error) {
 		return nil, cli.Create(l, args[1:])
 	case "rm", "remove":
 		return nil, cli.Remove(l, args[1:])
+	case "export":
+		return nil, cli.Export(l, args[1:])
+	case "import":
+		return nil, cli.Import(l, args[1:])
 	case "path":
 		return nil, cli.Path(l, args[1:])
 	case "run":

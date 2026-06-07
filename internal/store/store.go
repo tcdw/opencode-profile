@@ -104,10 +104,8 @@ func (s *Store) Init() error {
 	}
 	defer unlock()
 	l := s.layout
-	for _, d := range []string{l.Shared(), l.SharedSkills(), l.ProfilesDir()} {
-		if err := os.MkdirAll(d, 0o755); err != nil {
-			return err
-		}
+	if err := s.ensureSkeleton(); err != nil {
+		return err
 	}
 	if src := l.LiveAuth(); fileExists(src) && !fileExists(l.SharedAuth()) {
 		if err := copyFile(src, l.SharedAuth(), 0o600); err != nil {
@@ -128,6 +126,30 @@ func (s *Store) Init() error {
 		return s.Save()
 	}
 	return nil
+}
+
+// ensureSkeleton creates the store's directory skeleton. It does NOT seed from
+// the live opencode dirs and does NOT take the lock — callers that already hold
+// it (Init) use this directly.
+func (s *Store) ensureSkeleton() error {
+	for _, d := range []string{s.layout.Shared(), s.layout.SharedSkills(), s.layout.ProfilesDir()} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// EnsureSkeleton creates the store skeleton without seeding from the live
+// opencode dirs. Import uses this so a fresh machine isn't polluted by any
+// pre-existing live config — only the bundle's contents land in the store.
+func (s *Store) EnsureSkeleton() error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return s.ensureSkeleton()
 }
 
 // CreateOpts tunes profile creation.
@@ -200,12 +222,14 @@ func (s *Store) Create(name string, opts CreateOpts) (*Profile, error) {
 		}
 	}
 
-	p := &Profile{Name: name, Description: opts.Description, Modes: modes, CreatedAt: time.Now()}
 	for _, d := range AllDomains {
-		if err := s.materializeDomain(name, d, modes[d]); err != nil {
+		eff, err := s.materializeDomain(name, d, modes[d])
+		if err != nil {
 			return nil, err
 		}
+		modes[d] = eff // a linked domain may degrade to owned on symlink-hostile FS
 	}
+	p := &Profile{Name: name, Description: opts.Description, Modes: modes, CreatedAt: time.Now()}
 
 	s.Profiles = append(s.Profiles, *p)
 	if err := s.Save(); err != nil {
@@ -273,19 +297,7 @@ func (s *Store) SetMode(name string, d Domain, to DomainMode) error {
 		if err := removeIfExists(target); err != nil { // drop the symlink
 			return err
 		}
-		if d == DomainSkills {
-			if dirExists(source) {
-				if err := copyTree(source, target); err != nil {
-					return err
-				}
-			} else if err := os.MkdirAll(target, 0o755); err != nil {
-				return err
-			}
-		} else if fileExists(source) {
-			if err := copyFile(source, target, 0o600); err != nil {
-				return err
-			}
-		} else if err := writeAtomic(target, []byte("{}\n"), 0o600); err != nil {
+		if err := copyShareInto(d, source, target); err != nil {
 			return err
 		}
 	case ModeLinked:
@@ -334,39 +346,97 @@ func (s *Store) domainShared(d Domain) string {
 }
 
 // materializeDomain (re)creates a domain's on-disk form: a symlink into the
-// shared base (linked) or a self-contained copy (owned).
-func (s *Store) materializeDomain(name string, d Domain, mode DomainMode) error {
+// shared base (linked) or a self-contained copy (owned). It returns the
+// effective mode, which differs from the requested one only when a linked
+// domain has to degrade to owned because the filesystem refuses symlinks.
+func (s *Store) materializeDomain(name string, d Domain, mode DomainMode) (DomainMode, error) {
 	target := s.domainTarget(name, d)
 	source := s.domainShared(d)
 	if err := mustBeUnderRoot(s.layout.Root, target); err != nil {
-		return err
+		return mode, err
 	}
 	if err := removeIfExists(target); err != nil {
-		return err
+		return mode, err
 	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return err
+		return mode, err
 	}
 
 	switch mode {
 	case ModeLinked:
 		if err := ensureSharedExists(d, source); err != nil {
-			return err
+			return mode, err
 		}
-		return os.Symlink(source, target)
-	case ModeOwned:
-		if d == DomainSkills {
-			if dirExists(source) {
-				return copyTree(source, target)
+		if err := os.Symlink(source, target); err != nil {
+			// A restricted filesystem (notably Windows without the symlink
+			// privilege) refuses links; fall back to a self-contained copy so
+			// the profile still works, and report the downgraded mode.
+			if cErr := copyShareInto(d, source, target); cErr != nil {
+				return mode, fmt.Errorf("symlink %s failed (%v) and copy fallback failed: %w", target, err, cErr)
 			}
-			return os.MkdirAll(target, 0o755)
+			return ModeOwned, nil
 		}
-		if fileExists(source) {
-			return copyFile(source, target, 0o600)
+		return ModeLinked, nil
+	case ModeOwned:
+		if err := copyShareInto(d, source, target); err != nil {
+			return mode, err
 		}
-		return writeAtomic(target, []byte("{}\n"), 0o600)
+		return ModeOwned, nil
 	}
-	return fmt.Errorf("unknown domain mode %q", mode)
+	return mode, fmt.Errorf("unknown domain mode %q", mode)
+}
+
+// copyShareInto writes a self-contained (owned) copy of a domain's shared base
+// into target: a deep copy for skills, the shared file (or an empty JSON object
+// when absent) for auth/mcp_auth.
+func copyShareInto(d Domain, source, target string) error {
+	if d == DomainSkills {
+		if dirExists(source) {
+			return copyTree(source, target)
+		}
+		return os.MkdirAll(target, 0o755)
+	}
+	if fileExists(source) {
+		return copyFile(source, target, 0o600)
+	}
+	return writeAtomic(target, []byte("{}\n"), 0o600)
+}
+
+// MaterializeDomain (re)creates a domain on disk for an imported profile and
+// returns the effective mode. Unlike the internal helper it takes the store
+// lock, so import (a separate package) can call it safely.
+func (s *Store) MaterializeDomain(name string, d Domain, want DomainMode) (DomainMode, error) {
+	unlock, err := s.lock()
+	if err != nil {
+		return want, err
+	}
+	defer unlock()
+	return s.materializeDomain(name, d, want)
+}
+
+// AddProfile appends an externally-constructed profile (e.g. assembled by
+// import) and persists it. It refuses a duplicate name; a caller wanting to
+// replace an existing profile must Remove it first.
+func (s *Store) AddProfile(p Profile) error {
+	if err := ValidateName(p.Name); err != nil {
+		return err
+	}
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if _, err := s.Get(p.Name); err == nil {
+		return fmt.Errorf("profile %q already exists", p.Name)
+	}
+	if p.Modes == nil {
+		p.Modes = defaultModes()
+	}
+	if p.CreatedAt.IsZero() {
+		p.CreatedAt = time.Now()
+	}
+	s.Profiles = append(s.Profiles, p)
+	return s.Save()
 }
 
 // ensureSharedExists makes sure a linked symlink won't dangle.

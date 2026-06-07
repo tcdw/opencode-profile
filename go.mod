@@ -8,7 +8,8 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/tidwall/gjson v1.19.0
 	github.com/tidwall/sjson v1.2.5
-	golang.org/x/sys v0.38.0
+	golang.org/x/sys v0.44.0
+	golang.org/x/term v0.43.0
 )
 
 require (

@@ -1,0 +1,196 @@
+package transfer
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/tcdw/opencode-profile/internal/paths"
+	"github.com/tcdw/opencode-profile/internal/store"
+)
+
+func mustMkdirAll(t *testing.T, p string) {
+	t.Helper()
+	if err := os.MkdirAll(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustWrite(t *testing.T, p, content string) {
+	t.Helper()
+	mustMkdirAll(t, filepath.Dir(p))
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestRoundTrip exports a store with one all-linked and one owned profile, then
+// imports it into a second root and verifies the reconstruction is faithful and
+// portable (modes, secret contents/perms, path-ref rewriting, symlink vs copy).
+func TestRoundTrip(t *testing.T) {
+	tmp := t.TempDir()
+	liveCfg := filepath.Join(tmp, "live-config")
+	liveData := filepath.Join(tmp, "live-data")
+	t.Setenv("XDG_CONFIG_HOME", liveCfg)
+	t.Setenv("XDG_DATA_HOME", liveData)
+	mustMkdirAll(t, filepath.Join(liveCfg, "opencode"))
+	mustMkdirAll(t, filepath.Join(liveData, "opencode"))
+
+	rootA := filepath.Join(tmp, "store-a")
+	rootB := filepath.Join(tmp, "store-b")
+	absA, _ := filepath.Abs(rootA)
+	absB, _ := filepath.Abs(rootB)
+
+	// Live opencode.json carries an absolute {file:} ref into store-a's key —
+	// import must rewrite this to store-b's root.
+	ref := "{file:" + absA + "/shared/rightcapital.key}"
+	liveJSON := `{"model":"prov/m","provider":{"x":{"options":{"apiKey":"` + ref +
+		`"}}},"mcp":{"figma":{"type":"remote","headers":{"Authorization":"Bearer ` + ref + `"}}}}` + "\n"
+	mustWrite(t, filepath.Join(liveCfg, "opencode", "opencode.json"), liveJSON)
+	mustWrite(t, filepath.Join(liveCfg, "opencode", "AGENTS.md"), "jirai prompt\n")
+	mustWrite(t, filepath.Join(liveData, "opencode", "auth.json"), `{"openai":{"type":"oauth"}}`)
+	mustWrite(t, filepath.Join(liveData, "opencode", "mcp-auth.json"), `{"notion":{"token":"x"}}`)
+
+	lA := paths.Layout{Root: rootA}
+	sA, err := store.Open(lA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sA.Init(); err != nil {
+		t.Fatal(err)
+	}
+
+	// A loose shared secret + a shared skill.
+	mustWrite(t, filepath.Join(lA.Shared(), "rightcapital.key"), "sk-secret-key-value")
+	mustWrite(t, filepath.Join(lA.SharedSkills(), "demo", "SKILL.md"), "# demo skill\n")
+
+	if _, err := sA.Create("alpha", store.CreateOpts{Description: "linked one"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sA.Create("beta", store.CreateOpts{
+		Description: "owned one",
+		Modes: map[store.Domain]store.DomainMode{
+			store.DomainAuth:   store.ModeOwned,
+			store.DomainSkills: store.ModeOwned,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Give beta a distinct owned auth so we can prove owned content travels.
+	mustWrite(t, lA.ProfileAuth("beta"), `{"beta":"owned"}`)
+
+	bundle := filepath.Join(tmp, "b.zip")
+	now := time.Unix(1_700_000_000, 0)
+	if err := Export(lA, ExportOpts{Out: bundle, Passphrase: "pw", Now: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	lB := paths.Layout{Root: rootB}
+	if err := Import(lB, ImportOpts{Bundle: bundle, Passphrase: "pw", Now: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wrong passphrase must be rejected.
+	if err := Import(paths.Layout{Root: filepath.Join(tmp, "store-c")},
+		ImportOpts{Bundle: bundle, Passphrase: "nope", Now: now}); err == nil {
+		t.Error("import with wrong passphrase should fail")
+	}
+
+	sB, err := store.Open(lB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := sB.Get("alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Modes[store.DomainAuth] != store.ModeLinked {
+		t.Errorf("alpha auth: want linked, got %s", a.Modes[store.DomainAuth])
+	}
+	b, err := sB.Get("beta")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Modes[store.DomainAuth] != store.ModeOwned {
+		t.Errorf("beta auth: want owned, got %s", b.Modes[store.DomainAuth])
+	}
+	if b.Modes[store.DomainSkills] != store.ModeOwned {
+		t.Errorf("beta skills: want owned, got %s", b.Modes[store.DomainSkills])
+	}
+
+	// Shared secrets present, 0600, content preserved.
+	for _, name := range []string{"auth.json", "mcp-auth.json", "rightcapital.key"} {
+		fi, err := os.Stat(filepath.Join(lB.Shared(), name))
+		if err != nil {
+			t.Fatalf("shared %s missing: %v", name, err)
+		}
+		if fi.Mode().Perm() != 0o600 {
+			t.Errorf("shared %s perm = %o, want 600", name, fi.Mode().Perm())
+		}
+	}
+	if got, _ := os.ReadFile(filepath.Join(lB.Shared(), "rightcapital.key")); string(got) != "sk-secret-key-value" {
+		t.Errorf("shared key content = %q", got)
+	}
+
+	// opencode.json: ref rewritten from source root to dest root.
+	ajson, _ := os.ReadFile(lB.OpencodeJSON("alpha"))
+	if bytes.Contains(ajson, []byte(absA)) {
+		t.Errorf("alpha opencode.json still references the source root %q", absA)
+	}
+	if !bytes.Contains(ajson, []byte(absB)) {
+		t.Errorf("alpha opencode.json missing rewritten dest root; got %s", ajson)
+	}
+
+	if md, _ := os.ReadFile(lB.AgentsMD("alpha")); string(md) != "jirai prompt\n" {
+		t.Errorf("alpha AGENTS.md = %q", md)
+	}
+
+	// Linked domain is a symlink; owned domain is a real file with owned data.
+	if fi, err := os.Lstat(lB.ProfileAuth("alpha")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Errorf("alpha auth.json should be a symlink (err=%v)", err)
+	}
+	if fi, err := os.Lstat(lB.ProfileAuth("beta")); err != nil || fi.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("beta auth.json should be a real file (err=%v)", err)
+	}
+	if got, _ := os.ReadFile(lB.ProfileAuth("beta")); string(got) != `{"beta":"owned"}` {
+		t.Errorf("beta owned auth content = %q", got)
+	}
+
+	// Skills: shared and beta-owned both present.
+	if _, err := os.Stat(filepath.Join(lB.SharedSkills(), "demo", "SKILL.md")); err != nil {
+		t.Errorf("shared skill missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(lB.ProfileSkills("beta"), "demo", "SKILL.md")); err != nil {
+		t.Errorf("beta owned skill missing: %v", err)
+	}
+
+	// The session DB is never carried.
+	if _, err := os.Stat(filepath.Join(lB.ProfileDataOpencode("alpha"), "opencode.db")); !os.IsNotExist(err) {
+		t.Error("opencode.db should not be imported")
+	}
+}
+
+func TestCryptoRoundTrip(t *testing.T) {
+	plain := []byte("top secret bytes — 雪乃碗")
+	blob, err := Seal(plain, "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Open(blob, "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, plain) {
+		t.Fatalf("round trip mismatch: %q", got)
+	}
+	if _, err := Open(blob, "wrong"); err == nil {
+		t.Error("wrong passphrase should fail")
+	}
+	tampered := append([]byte(nil), blob...)
+	tampered[len(tampered)-1] ^= 0xff
+	if _, err := Open(tampered, "pw"); err == nil {
+		t.Error("tampered blob should fail authentication")
+	}
+}

@@ -12,6 +12,8 @@ import (
 	"github.com/tcdw/opencode-profile/internal/launch"
 	"github.com/tcdw/opencode-profile/internal/paths"
 	"github.com/tcdw/opencode-profile/internal/store"
+	"github.com/tcdw/opencode-profile/internal/transfer"
+	"golang.org/x/term"
 )
 
 var Version = "dev"
@@ -113,6 +115,94 @@ func Run(l paths.Layout, args []string) (*launch.Plan, error) {
 	return launch.BuildPlan(l, name, extra)
 }
 
+// Export writes a portable, encrypted bundle of one or more profiles.
+// Names may appear before and/or after flags; with none, all profiles export.
+func Export(l paths.Layout, args []string) error {
+	transfer.ToolVersion = Version
+	fs := flag.NewFlagSet("export", flag.ContinueOnError)
+	out := fs.String("o", "", "output .zip path (default ocp-export-<timestamp>.zip)")
+	i := 0
+	for i < len(args) && !strings.HasPrefix(args[i], "-") {
+		i++
+	}
+	names := append([]string{}, args[:i]...)
+	if err := fs.Parse(args[i:]); err != nil {
+		return err
+	}
+	names = append(names, fs.Args()...)
+
+	pass, err := exportPassphrase()
+	if err != nil {
+		return err
+	}
+	return transfer.Export(l, transfer.ExportOpts{
+		Names: names, Out: *out, Passphrase: pass, Log: os.Stderr,
+	})
+}
+
+// Import reconstructs profiles from a bundle into the current store.
+func Import(l paths.Layout, args []string) error {
+	transfer.ToolVersion = Version
+	fs := flag.NewFlagSet("import", flag.ContinueOnError)
+	force := fs.Bool("force", false, "overwrite existing profiles and shared secrets")
+	var bundle string
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		bundle, args = args[0], args[1:]
+	}
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if bundle == "" {
+		bundle = fs.Arg(0)
+	}
+	if bundle == "" {
+		return fmt.Errorf("usage: ocp import <bundle.zip> [--force]")
+	}
+	pass, err := readPassphrase("passphrase for the bundle: ")
+	if err != nil {
+		return err
+	}
+	return transfer.Import(l, transfer.ImportOpts{
+		Bundle: bundle, Passphrase: pass, Overwrite: *force, Log: os.Stderr,
+	})
+}
+
+// readPassphrase returns $OCP_PASSPHRASE if set, else prompts without echo.
+func readPassphrase(prompt string) (string, error) {
+	if v := os.Getenv("OCP_PASSPHRASE"); v != "" {
+		return v, nil
+	}
+	fmt.Fprint(os.Stderr, prompt)
+	b, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// exportPassphrase prompts twice (and confirms) unless $OCP_PASSPHRASE is set.
+func exportPassphrase() (string, error) {
+	if v := os.Getenv("OCP_PASSPHRASE"); v != "" {
+		return v, nil
+	}
+	p1, err := readPassphrase("passphrase to encrypt the bundle: ")
+	if err != nil {
+		return "", err
+	}
+	if p1 == "" {
+		return "", fmt.Errorf("empty passphrase")
+	}
+	p2, err := readPassphrase("confirm passphrase: ")
+	if err != nil {
+		return "", err
+	}
+	if p1 != p2 {
+		return "", fmt.Errorf("passphrases do not match")
+	}
+	return p1, nil
+}
+
 // Path prints shell export lines so a user can `eval "$(ocp path x)"` and then
 // run opencode manually.
 func Path(l paths.Layout, args []string) error {
@@ -149,6 +239,8 @@ USAGE:
   ocp list | ls            list profiles
   ocp create <name>        create a profile (-desc, -blank)
   ocp rm <name>            delete a profile
+  ocp export [names...]    write an encrypted .zip bundle (-o out.zip; all if no names)
+  ocp import <bundle.zip>  restore profiles from a bundle (--force to overwrite)
   ocp path <name>          print export lines for the profile's XDG dirs
   ocp init                 initialize the store and seed the shared base
   ocp -v | --version       print version

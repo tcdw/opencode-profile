@@ -36,11 +36,7 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+# Release notes come from CHANGELOG.md via ffurrer2/extract-release-notes
+# (passed to `goreleaser release --release-notes`), so skip the git-log changelog.
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^ci:"
-      - Merge pull request
-      - Merge branch
+  disable: true

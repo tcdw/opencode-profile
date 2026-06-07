@@ -58,9 +58,38 @@ ocp run <name> [-- opencode args]   # launch directly (good for shell aliases)
 ocp list                            # list profiles
 ocp create <name> [-desc ..] [-blank]
 ocp rm <name>
+ocp export [names...] [-o b.zip]    # encrypted, portable bundle (all profiles if none named)
+ocp import <bundle.zip> [--force]   # restore into the current store
 ocp path <name>                     # print export lines: eval "$(ocp path work)"
 ocp init                            # create the store, seed shared from current config
 ```
+
+## Moving profiles between machines
+
+`ocp export` writes a single self-contained `.zip` you can carry anywhere (e.g.
+to a Windows box). The bundle is portable by design:
+
+- **Config travels in plaintext** — `opencode.json`, `AGENTS.md`, and skills are
+  readable/diffable inside the zip.
+- **Secrets are encrypted** — `auth.json`, `mcp-auth.json`, and any `*.key`
+  are packed into one `secrets.enc` blob (AES-256-GCM, key derived from your
+  passphrase via PBKDF2). You're prompted for a passphrase, or set
+  `OCP_PASSPHRASE` for non-interactive use.
+- **No symlinks, no machine-specific paths** — link/own state is recorded as
+  metadata and rebuilt on import (a `linked` domain that can't be symlinked,
+  e.g. on Windows without privilege, degrades to an owned copy). Absolute
+  `{file:...}` references in `opencode.json` are rewritten to the new machine's
+  store root. The 246 MB session DB, caches, and `.bak` files are never included.
+
+```sh
+ocp export -o work.zip                 # bundle every profile
+ocp export rc-intl rc-cn -o rc.zip     # just these two
+ocp import work.zip                     # restore (skips names that already exist)
+ocp import work.zip --force             # overwrite existing profiles + shared secrets
+```
+
+After importing, re-run any login that wasn't carried (`ocp run <name> -- auth login`),
+or just rely on the bundled secrets if you exported them.
 
 The built-in **`default`** profile runs opencode against your live config (no override).
 
