@@ -1,10 +1,9 @@
-//go:build unix
-
 package store
 
 import (
 	"os"
-	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 // lock takes an exclusive advisory lock on Root/.lock so two ocp processes can't
@@ -18,12 +17,14 @@ func (s *Store) lock() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+	var ol windows.Overlapped
+	if err := windows.LockFileEx(windows.Handle(f.Fd()), windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &ol); err != nil {
 		f.Close()
 		return nil, err
 	}
 	return func() {
-		syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		var ol windows.Overlapped
+		windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &ol)
 		f.Close()
 	}, nil
 }
