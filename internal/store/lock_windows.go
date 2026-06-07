@@ -23,8 +23,7 @@ func (s *Store) lock() (func(), error) {
 		return nil, err
 	}
 	return func() {
-		var ol windows.Overlapped
-		windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &ol)
+		_ = windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &ol)
 		f.Close()
 	}, nil
 }
