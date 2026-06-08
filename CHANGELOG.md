@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-08
+
+### Added
+
+- Support `opencode.jsonc` alongside `opencode.json` across profile creation, launch environment, TUI editors, and import/export bundles. Existing `.jsonc` files are preferred so a blank fallback `opencode.json` cannot mask the real config.
+- Export/import validation for profile system prompts: bundles must include each profile's `AGENTS.md`, while empty prompts remain valid for profiles that intentionally do not use a custom system prompt.
+- Creation-time hints when a profile inherits a non-empty live `AGENTS.md`, plus clearer TUI wording for the seed/blank choice so copied system prompts are visible instead of surprising.
+- Windows-specific launch environment now exports explicit `OPENCODE_CONFIG_DIR`, `OPENCODE_CONFIG`, and `OPENCODE_DB` paths in addition to the XDG directories, matching opencode's config discovery more reliably on Windows.
+- Tests covering JSONC round-trips, missing profile config, missing `AGENTS.md`, Windows symlink fallback behavior, and generated opencode environment variables.
+
+### Changed
+
+- Profile creation preserves the live config filename extension when seeding from the current opencode config.
+- Import/export preserves `opencode.jsonc` entries instead of normalizing everything to `opencode.json`.
+- The TUI and CLI now resolve the active profile config through the same config lookup helper used by launch.
+- Windows symlink failures during mode changes fall back to owned copies, matching the existing import/materialization behavior.
+
+### Fixed
+
+- Custom providers and API-key settings were not initialized on Windows when the selected profile's config lived in `opencode.jsonc`.
+- Export no longer silently skips profiles whose opencode config is missing.
+- Import no longer creates profiles with an empty placeholder config or prompt when the bundle is missing required profile files.
+- Release workflow compatibility was updated for newer GitHub Actions runtime behavior.
+
 ## [0.2.0] - 2026-06-07
 
 ### Added
@@ -37,7 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared base with per-domain override (linked symlink vs. owned copy), an interactive TUI picker and a CLI (`run`/`list`/`create`/`rm`/`path`/`init`), surgical `opencode.json` edits via gjson/sjson, and a built-in `default` profile that runs against the live config.
 - GoReleaser configuration and a tag-triggered release workflow.
 
-[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tcdw/opencode-profile/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tcdw/opencode-profile/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/tcdw/opencode-profile/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/tcdw/opencode-profile/releases/tag/v0.1.0
