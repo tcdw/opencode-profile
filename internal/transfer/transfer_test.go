@@ -238,6 +238,39 @@ func TestExportFailsWhenProfileConfigMissing(t *testing.T) {
 	}
 }
 
+func TestExportFailsWhenAgentsMissing(t *testing.T) {
+	tmp := t.TempDir()
+	liveCfg := filepath.Join(tmp, "live-config")
+	liveData := filepath.Join(tmp, "live-data")
+	t.Setenv("XDG_CONFIG_HOME", liveCfg)
+	t.Setenv("XDG_DATA_HOME", liveData)
+	mustMkdirAll(t, filepath.Join(liveCfg, "opencode"))
+	mustMkdirAll(t, filepath.Join(liveData, "opencode"))
+
+	l := paths.Layout{Root: filepath.Join(tmp, "store")}
+	s, err := store.Open(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Create("broken", store.CreateOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(l.AgentsMD("broken")); err != nil {
+		t.Fatal(err)
+	}
+
+	err = Export(l, ExportOpts{Out: filepath.Join(tmp, "broken.zip"), Passphrase: "pw"})
+	if err == nil {
+		t.Fatal("Export should fail when a profile is missing AGENTS.md")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("missing AGENTS.md")) {
+		t.Fatalf("Export error = %v, want missing AGENTS.md", err)
+	}
+}
+
 func TestImportFailsWhenBundleProfileConfigMissing(t *testing.T) {
 	tmp := t.TempDir()
 	bundle := filepath.Join(tmp, "bad.zip")
@@ -278,6 +311,52 @@ func TestImportFailsWhenBundleProfileConfigMissing(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(err.Error()), []byte("missing opencode.json")) {
 		t.Fatalf("Import error = %v, want missing opencode.json or opencode.jsonc", err)
+	}
+}
+
+func TestImportFailsWhenBundleAgentsMissing(t *testing.T) {
+	tmp := t.TempDir()
+	bundle := filepath.Join(tmp, "bad.zip")
+	f, err := os.Create(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	now := time.Unix(1_700_000_000, 0)
+	man := `{
+  "schema": 1,
+  "tool": "opencode-profile",
+  "tool_version": "test",
+  "created_at": "2023-11-14T22:13:20Z",
+  "source_os": "test",
+  "source_root": "",
+  "secrets": {"mode": "encrypted"},
+  "profiles": [{
+    "name": "broken",
+    "modes": {"auth": "linked", "mcp_auth": "linked", "skills": "linked"},
+    "created_at": "2023-11-14T22:13:20Z"
+  }]
+}
+`
+	if err := zipBytes(zw, manifestName, []byte(man), 0o644, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := zipBytes(zw, "profiles/broken/opencode.json", []byte("{}\n"), 0o600, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = Import(paths.Layout{Root: filepath.Join(tmp, "store")}, ImportOpts{Bundle: bundle})
+	if err == nil {
+		t.Fatal("Import should fail when a bundle profile is missing AGENTS.md")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("missing AGENTS.md")) {
+		t.Fatalf("Import error = %v, want missing AGENTS.md", err)
 	}
 }
 

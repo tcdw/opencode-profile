@@ -47,7 +47,7 @@ func List(l paths.Layout) error {
 func Create(l paths.Layout, args []string) error {
 	fs := flag.NewFlagSet("create", flag.ContinueOnError)
 	desc := fs.String("desc", "", "profile description")
-	blank := fs.Bool("blank", false, "seed a minimal config instead of copying the current one")
+	blank := fs.Bool("blank", false, "seed a minimal config and empty AGENTS.md instead of copying the current config")
 	// Accept the name either before or after flags: stdlib flag stops parsing at
 	// the first positional, so pull a leading bare token out as the name first.
 	var name string
@@ -77,6 +77,9 @@ func Create(l paths.Layout, args []string) error {
 		return err
 	}
 	fmt.Printf("created profile %q at %s\n", p.Name, l.ProfileDir(p.Name))
+	if !*blank && nonEmptyFile(l.LiveAgentsMD()) {
+		fmt.Fprintf(os.Stderr, "warning: copied non-empty system prompt from %s into this profile's AGENTS.md; use -blank for an empty prompt\n", l.LiveAgentsMD())
+	}
 	return nil
 }
 
@@ -232,6 +235,11 @@ func Path(l paths.Layout, args []string) error {
 }
 
 func PrintVersion() { fmt.Println("opencode-profile " + Version) }
+
+func nonEmptyFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir() && info.Size() > 0
+}
 
 func Usage() {
 	fmt.Print(`opencode-profile (ocp) — isolated profiles for opencode

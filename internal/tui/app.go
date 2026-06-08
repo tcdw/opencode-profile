@@ -222,6 +222,9 @@ func (m rootModel) updateCreate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.refreshList()
 		m.status = fmt.Sprintf("created profile %q", name)
+		if !m.create.blank && nonEmptyFile(m.layout.LiveAgentsMD()) {
+			m.status += "; copied non-empty live AGENTS.md"
+		}
 		m.screen = screenList
 		return m, nil
 	}
@@ -271,4 +274,9 @@ func (m rootModel) View() string {
 		}
 		return v
 	}
+}
+
+func nonEmptyFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir() && info.Size() > 0
 }

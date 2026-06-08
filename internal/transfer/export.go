@@ -148,10 +148,12 @@ func writeBundle(zw *zip.Writer, l paths.Layout, man Manifest, selected []store.
 		if err := zipBytes(zw, base+filepath.Base(cfg), data, 0o600, now); err != nil {
 			return err
 		}
-		if data, err := os.ReadFile(l.AgentsMD(p.Name)); err == nil {
-			if err := zipBytes(zw, base+"AGENTS.md", data, 0o644, now); err != nil {
-				return err
-			}
+		agents, err := os.ReadFile(l.AgentsMD(p.Name))
+		if err != nil {
+			return fmt.Errorf("profile %q missing AGENTS.md at %s: %w", p.Name, l.AgentsMD(p.Name), err)
+		}
+		if err := zipBytes(zw, base+"AGENTS.md", agents, 0o644, now); err != nil {
+			return err
 		}
 		if p.Modes[store.DomainSkills] == store.ModeOwned {
 			if err := addTreeDeref(zw, l.ProfileSkills(p.Name), base+"skills/", now); err != nil {

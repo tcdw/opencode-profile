@@ -169,8 +169,8 @@ func importProfile(l paths.Layout, s *store.Store, pe ProfileEntry, index map[st
 		if err := writeFile(l.AgentsMD(name), raw, 0o644); err != nil {
 			return err
 		}
-	} else if err := writeFile(l.AgentsMD(name), []byte{}, 0o644); err != nil {
-		return err
+	} else {
+		return fmt.Errorf("bundle profile %q is missing AGENTS.md", name)
 	}
 
 	// owned domain payloads placed before materialization.

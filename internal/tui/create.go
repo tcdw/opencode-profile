@@ -79,9 +79,9 @@ func (m *createModel) syncFocus() {
 }
 
 func (m createModel) View() string {
-	seed := "[ ] seed from current config"
+	seed := "[ ] seed from current config (copies opencode.json[c] + AGENTS.md)"
 	if m.blank {
-		seed = "[x] seed BLANK (ignore current config)"
+		seed = "[x] seed BLANK (minimal config + empty AGENTS.md)"
 	}
 	if m.focus == 2 {
 		seed = focusStyle.Render(seed)
