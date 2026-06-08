@@ -1,9 +1,11 @@
 package transfer
 
 import (
+	"archive/zip"
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -107,7 +109,11 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	if a.Modes[store.DomainAuth] != store.ModeLinked {
-		t.Errorf("alpha auth: want linked, got %s", a.Modes[store.DomainAuth])
+		if runtime.GOOS == "windows" && a.Modes[store.DomainAuth] == store.ModeOwned {
+			t.Log("alpha auth degraded to owned because symlinks are unavailable")
+		} else {
+			t.Errorf("alpha auth: want linked, got %s", a.Modes[store.DomainAuth])
+		}
 	}
 	b, err := sB.Get("beta")
 	if err != nil {
@@ -126,7 +132,7 @@ func TestRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("shared %s missing: %v", name, err)
 		}
-		if fi.Mode().Perm() != 0o600 {
+		if runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 {
 			t.Errorf("shared %s perm = %o, want 600", name, fi.Mode().Perm())
 		}
 	}
@@ -139,7 +145,7 @@ func TestRoundTrip(t *testing.T) {
 	if bytes.Contains(ajson, []byte(absA)) {
 		t.Errorf("alpha opencode.json still references the source root %q", absA)
 	}
-	if !bytes.Contains(ajson, []byte(absB)) {
+	if !bytes.Contains(ajson, []byte(filepath.ToSlash(absB))) {
 		t.Errorf("alpha opencode.json missing rewritten dest root; got %s", ajson)
 	}
 
@@ -148,8 +154,12 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	// Linked domain is a symlink; owned domain is a real file with owned data.
-	if fi, err := os.Lstat(lB.ProfileAuth("alpha")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
-		t.Errorf("alpha auth.json should be a symlink (err=%v)", err)
+	if fi, err := os.Lstat(lB.ProfileAuth("alpha")); err != nil {
+		t.Errorf("alpha auth.json missing (err=%v)", err)
+	} else if a.Modes[store.DomainAuth] == store.ModeLinked && fi.Mode()&os.ModeSymlink == 0 {
+		t.Error("alpha auth.json should be a symlink")
+	} else if a.Modes[store.DomainAuth] == store.ModeOwned && fi.Mode()&os.ModeSymlink != 0 {
+		t.Error("alpha auth.json fallback should be a real file")
 	}
 	if fi, err := os.Lstat(lB.ProfileAuth("beta")); err != nil || fi.Mode()&os.ModeSymlink != 0 {
 		t.Errorf("beta auth.json should be a real file (err=%v)", err)
@@ -192,5 +202,142 @@ func TestCryptoRoundTrip(t *testing.T) {
 	tampered[len(tampered)-1] ^= 0xff
 	if _, err := Open(tampered, "pw"); err == nil {
 		t.Error("tampered blob should fail authentication")
+	}
+}
+
+func TestExportFailsWhenProfileConfigMissing(t *testing.T) {
+	tmp := t.TempDir()
+	liveCfg := filepath.Join(tmp, "live-config")
+	liveData := filepath.Join(tmp, "live-data")
+	t.Setenv("XDG_CONFIG_HOME", liveCfg)
+	t.Setenv("XDG_DATA_HOME", liveData)
+	mustMkdirAll(t, filepath.Join(liveCfg, "opencode"))
+	mustMkdirAll(t, filepath.Join(liveData, "opencode"))
+
+	l := paths.Layout{Root: filepath.Join(tmp, "store")}
+	s, err := store.Open(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Create("broken", store.CreateOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(l.OpencodeJSON("broken")); err != nil {
+		t.Fatal(err)
+	}
+
+	err = Export(l, ExportOpts{Out: filepath.Join(tmp, "broken.zip"), Passphrase: "pw"})
+	if err == nil {
+		t.Fatal("Export should fail when a profile is missing opencode config")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("missing opencode config")) {
+		t.Fatalf("Export error = %v, want missing opencode config", err)
+	}
+}
+
+func TestImportFailsWhenBundleProfileConfigMissing(t *testing.T) {
+	tmp := t.TempDir()
+	bundle := filepath.Join(tmp, "bad.zip")
+	f, err := os.Create(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	now := time.Unix(1_700_000_000, 0)
+	man := `{
+  "schema": 1,
+  "tool": "opencode-profile",
+  "tool_version": "test",
+  "created_at": "2023-11-14T22:13:20Z",
+  "source_os": "test",
+  "source_root": "",
+  "secrets": {"mode": "encrypted"},
+  "profiles": [{
+    "name": "broken",
+    "modes": {"auth": "linked", "mcp_auth": "linked", "skills": "linked"},
+    "created_at": "2023-11-14T22:13:20Z"
+  }]
+}
+`
+	if err := zipBytes(zw, manifestName, []byte(man), 0o644, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = Import(paths.Layout{Root: filepath.Join(tmp, "store")}, ImportOpts{Bundle: bundle})
+	if err == nil {
+		t.Fatal("Import should fail when a bundle profile is missing opencode config")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("missing opencode.json")) {
+		t.Fatalf("Import error = %v, want missing opencode.json or opencode.jsonc", err)
+	}
+}
+
+func TestJSONCConfigRoundTrip(t *testing.T) {
+	tmp := t.TempDir()
+	liveCfg := filepath.Join(tmp, "live-config")
+	liveData := filepath.Join(tmp, "live-data")
+	t.Setenv("XDG_CONFIG_HOME", liveCfg)
+	t.Setenv("XDG_DATA_HOME", liveData)
+	mustWrite(t, filepath.Join(liveCfg, "opencode", "opencode.jsonc"), "{\n  // company provider\n  \"provider\": {\"company\": {}}\n}\n")
+	mustMkdirAll(t, filepath.Join(liveData, "opencode"))
+
+	lA := paths.Layout{Root: filepath.Join(tmp, "store-a")}
+	sA, err := store.Open(lA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sA.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sA.Create("company", store.CreateOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := lA.OpencodeConfig("company"); got != lA.OpencodeJSONC("company") {
+		t.Fatalf("created config = %q, want %q", got, lA.OpencodeJSONC("company"))
+	}
+
+	bundle := filepath.Join(tmp, "jsonc.zip")
+	if err := Export(lA, ExportOpts{Out: bundle, Passphrase: "pw"}); err != nil {
+		t.Fatal(err)
+	}
+
+	zr, err := zip.OpenReader(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundJSONC := false
+	for _, f := range zr.File {
+		if f.Name == "profiles/company/opencode.jsonc" {
+			foundJSONC = true
+			break
+		}
+	}
+	zr.Close()
+	if !foundJSONC {
+		t.Fatal("bundle missing profiles/company/opencode.jsonc")
+	}
+
+	lB := paths.Layout{Root: filepath.Join(tmp, "store-b")}
+	if err := Import(lB, ImportOpts{Bundle: bundle, Passphrase: "pw"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := lB.OpencodeConfig("company"); got != lB.OpencodeJSONC("company") {
+		t.Fatalf("imported config = %q, want %q", got, lB.OpencodeJSONC("company"))
+	}
+	data, err := os.ReadFile(lB.OpencodeJSONC("company"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte("// company provider")) {
+		t.Fatalf("imported JSONC lost comments: %s", data)
 	}
 }

@@ -3,6 +3,7 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/tcdw/opencode-profile/internal/paths"
@@ -53,15 +54,21 @@ func TestCreateLinksAndReconcile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Modes[DomainAuth] != ModeLinked {
-		t.Error("new profile should default auth to linked")
-	}
 	fi, err := os.Lstat(l.ProfileAuth("work"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fi.Mode()&os.ModeSymlink == 0 {
-		t.Error("linked auth.json should be a symlink")
+	switch p.Modes[DomainAuth] {
+	case ModeLinked:
+		if fi.Mode()&os.ModeSymlink == 0 {
+			t.Error("linked auth.json should be a symlink")
+		}
+	case ModeOwned:
+		if fi.Mode()&os.ModeSymlink != 0 {
+			t.Error("owned auth.json should be a real file")
+		}
+	default:
+		t.Fatalf("new profile auth mode = %s, want linked or owned fallback", p.Modes[DomainAuth])
 	}
 	// reopening must reconcile to the same on-disk truth
 	s2, _ := Open(l)
@@ -69,8 +76,8 @@ func TestCreateLinksAndReconcile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pp.Modes[DomainAuth] != ModeLinked {
-		t.Error("reconcile should report linked for a symlink")
+	if pp.Modes[DomainAuth] != p.Modes[DomainAuth] {
+		t.Errorf("reconcile auth mode = %s, want %s", pp.Modes[DomainAuth], p.Modes[DomainAuth])
 	}
 }
 
@@ -95,8 +102,24 @@ func TestSetModeRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	fi, _ = os.Lstat(l.ProfileAuth("work"))
-	if fi.Mode()&os.ModeSymlink == 0 {
-		t.Error("re-linked auth.json should be a symlink again")
+	p, err := s.Get("work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	switch p.Modes[DomainAuth] {
+	case ModeLinked:
+		if fi.Mode()&os.ModeSymlink == 0 {
+			t.Error("re-linked auth.json should be a symlink again")
+		}
+	case ModeOwned:
+		if runtime.GOOS != "windows" {
+			t.Error("linked auth should only degrade to owned on symlink-hostile platforms")
+		}
+		if fi.Mode()&os.ModeSymlink != 0 {
+			t.Error("fallback auth.json should be a real file")
+		}
+	default:
+		t.Fatalf("auth mode after relink = %s, want linked or owned fallback", p.Modes[DomainAuth])
 	}
 	if m, _ := filepath.Glob(l.ProfileAuth("work") + ".bak-*"); len(m) == 0 {
 		t.Error("owned->linked should back up the previous copy, not delete it")

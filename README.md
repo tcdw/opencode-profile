@@ -11,17 +11,20 @@ profile" side by side, sharing the same API keys.
 
 ## How isolation works
 
-opencode follows the XDG base-dir spec. `ocp` launches it with
-`XDG_CONFIG_HOME` / `XDG_DATA_HOME` (and state/cache) pointed inside a profile,
-so opencode resolves *all* of its config and data there — no files in your live
-`~/.config/opencode` or `~/.local/share/opencode` are ever touched.
+opencode follows the XDG base-dir spec and also supports explicit `OPENCODE_*`
+path overrides. `ocp` launches it with `XDG_CONFIG_HOME` / `XDG_DATA_HOME`
+(and state/cache) pointed inside a profile, plus `OPENCODE_CONFIG_DIR`,
+`OPENCODE_CONFIG`, and `OPENCODE_DB` for the paths opencode exposes directly.
+That keeps config and data isolated without touching your live
+`~/.config/opencode` or `~/.local/share/opencode`.
 
 | Isolated thing | Lives in | Travels via |
 |---|---|---|
 | API keys | `data/opencode/auth.json`, `mcp-auth.json` | `XDG_DATA_HOME` |
 | System prompt | `config/opencode/AGENTS.md` | `XDG_CONFIG_HOME` |
 | Skills | `config/opencode/skills/` | `XDG_CONFIG_HOME` |
-| MCP servers | `config/opencode/opencode.json` → `mcp` | `XDG_CONFIG_HOME` |
+| MCP servers | `config/opencode/opencode.json[c]` → `mcp` | `XDG_CONFIG_HOME` |
+| Session DB | `data/opencode/opencode.db` | `OPENCODE_DB` |
 
 ### Shared base + per-domain override
 
@@ -69,7 +72,7 @@ ocp init                            # create the store, seed shared from current
 `ocp export` writes a single self-contained `.zip` you can carry anywhere (e.g.
 to a Windows box). The bundle is portable by design:
 
-- **Config travels in plaintext** — `opencode.json`, `AGENTS.md`, and skills are
+- **Config travels in plaintext** — `opencode.json`/`opencode.jsonc`, `AGENTS.md`, and skills are
   readable/diffable inside the zip.
 - **Secrets are encrypted** — `auth.json`, `mcp-auth.json`, and any `*.key`
   are packed into one `secrets.enc` blob (AES-256-GCM, key derived from your
@@ -78,7 +81,7 @@ to a Windows box). The bundle is portable by design:
 - **No symlinks, no machine-specific paths** — link/own state is recorded as
   metadata and rebuilt on import (a `linked` domain that can't be symlinked,
   e.g. on Windows without privilege, degrades to an owned copy). Absolute
-  `{file:...}` references in `opencode.json` are rewritten to the new machine's
+  `{file:...}` references in opencode config are rewritten to the new machine's
   store root. The 246 MB session DB, caches, and `.bak` files are never included.
 
 ```sh
@@ -100,10 +103,10 @@ The built-in **`default`** profile runs opencode against your live config (no ov
   profiles.json                  # ocp metadata
   shared/{auth.json, mcp-auth.json, skills/}
   profiles/<name>/
-    config/opencode/{opencode.json, AGENTS.md, skills/}
+    config/opencode/{opencode.json[c], AGENTS.md, skills/}
     data/opencode/{auth.json→shared, mcp-auth.json→shared, opencode.db, ...}
     state/  cache/
 ```
 
-Profile `opencode.json` is edited surgically (via gjson/sjson), so toggling one
+Profile opencode config is edited surgically (via gjson/sjson), so toggling one
 MCP server or changing the model leaves the rest of the file byte-for-byte intact.

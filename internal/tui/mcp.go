@@ -21,7 +21,7 @@ type mcpModel struct {
 }
 
 func newMCP(l paths.Layout, name string) mcpModel {
-	p := l.OpencodeJSON(name)
+	p := l.OpencodeConfig(name)
 	e, err := ocfg.ListMCP(p)
 	return mcpModel{name: name, path: p, entries: e, err: err}
 }

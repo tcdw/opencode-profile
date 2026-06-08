@@ -16,8 +16,6 @@ import (
 	"github.com/tcdw/opencode-profile/internal/store"
 )
 
-const minimalConfig = "{\n  \"$schema\": \"https://opencode.ai/config.json\"\n}\n"
-
 // ImportOpts configures Import.
 type ImportOpts struct {
 	Bundle     string    // path to the .zip bundle
@@ -149,17 +147,18 @@ func importProfile(l paths.Layout, s *store.Store, pe ProfileEntry, index map[st
 	}
 
 	base := profPrefix + name + "/"
-	// opencode.json with absolute path refs rewritten to this machine's root.
-	if f := index[base+"opencode.json"]; f != nil {
+	// opencode config with absolute path refs rewritten to this machine's root.
+	if f, cfgName := bundleConfig(index, base); f != nil {
 		raw, err := readZip(f)
 		if err != nil {
 			return err
 		}
-		if err := writeFile(l.OpencodeJSON(name), rewriteRefs(raw, srcRoot, dstRoot), 0o600); err != nil {
+		dst := filepath.Join(l.ProfileConfigOpencode(name), cfgName)
+		if err := writeFile(dst, rewriteRefs(raw, srcRoot, dstRoot), 0o600); err != nil {
 			return err
 		}
-	} else if err := writeFile(l.OpencodeJSON(name), []byte(minimalConfig), 0o600); err != nil {
-		return err
+	} else {
+		return fmt.Errorf("bundle profile %q is missing opencode.json or opencode.jsonc", name)
 	}
 	// AGENTS.md
 	if f := index[base+"AGENTS.md"]; f != nil {
@@ -240,8 +239,17 @@ func ownedPresent(l paths.Layout, name string, d store.Domain) bool {
 	return false
 }
 
+func bundleConfig(index map[string]*zip.File, base string) (*zip.File, string) {
+	for _, name := range []string{paths.OpencodeJSONCName, paths.OpencodeJSONName} {
+		if f := index[base+name]; f != nil {
+			return f, name
+		}
+	}
+	return nil, ""
+}
+
 // rewriteRefs swaps the source machine's OCP_HOME prefix for this machine's,
-// fixing {file:<root>/...} references in opencode.json. The replacement uses
+// fixing {file:<root>/...} references in opencode config. The replacement uses
 // forward slashes, which Go's path resolution accepts on every OS.
 func rewriteRefs(data []byte, srcRoot, dstRoot string) []byte {
 	if srcRoot == "" {

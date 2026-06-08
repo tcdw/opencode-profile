@@ -200,8 +200,10 @@ func (s *Store) Create(name string, opts CreateOpts) (*Profile, error) {
 		if err := writeAtomic(l.OpencodeJSON(name), []byte(blankConfig), 0o600); err != nil {
 			return nil, err
 		}
-	case fileExists(l.LiveOpencodeJSON()):
-		if err := copyFile(l.LiveOpencodeJSON(), l.OpencodeJSON(name), 0o600); err != nil {
+	case fileExists(l.LiveOpencodeConfig()):
+		src := l.LiveOpencodeConfig()
+		dst := filepath.Join(l.ProfileConfigOpencode(name), filepath.Base(src))
+		if err := copyFile(src, dst, 0o600); err != nil {
 			return nil, err
 		}
 	default:
@@ -311,7 +313,10 @@ func (s *Store) SetMode(name string, d Domain, to DomainMode) error {
 			return err
 		}
 		if err := os.Symlink(source, target); err != nil {
-			return err
+			if cErr := copyShareInto(d, source, target); cErr != nil {
+				return fmt.Errorf("symlink %s failed (%v) and copy fallback failed: %w", target, err, cErr)
+			}
+			to = ModeOwned
 		}
 	default:
 		return fmt.Errorf("unknown domain mode %q", to)

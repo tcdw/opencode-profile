@@ -13,7 +13,7 @@ import (
 // "model" field and ignoring the rest of the (possibly large) config. Returns
 // "-" when unset or unreadable.
 func ReadModel(l paths.Layout, name string) string {
-	data, err := os.ReadFile(l.OpencodeJSON(name))
+	data, err := os.ReadFile(l.OpencodeConfig(name))
 	if err != nil {
 		return "-"
 	}

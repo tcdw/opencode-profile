@@ -35,8 +35,8 @@ type secretItem struct {
 	disk    string // source path on disk
 }
 
-// Export writes a portable bundle: plaintext config (AGENTS.md, opencode.json,
-// shared & owned skills) plus an encrypted blob holding every secret file.
+// Export writes a portable bundle: plaintext config (AGENTS.md,
+// opencode.json/jsonc, shared & owned skills) plus an encrypted blob holding every secret file.
 // Symlinks are never stored — domain modes in the manifest let import rebuild
 // them — and skills symlinks are dereferenced so the bundle is self-contained.
 func Export(l paths.Layout, opts ExportOpts) error {
@@ -137,13 +137,16 @@ func writeBundle(zw *zip.Writer, l paths.Layout, man Manifest, selected []store.
 	}
 	for _, p := range selected {
 		base := profPrefix + p.Name + "/"
-		if data, err := os.ReadFile(l.OpencodeJSON(p.Name)); err == nil {
-			for _, w := range scanInlineSecrets(data) {
-				fmt.Fprintf(logw, "warning: %s opencode.json: %s\n", p.Name, w)
-			}
-			if err := zipBytes(zw, base+"opencode.json", data, 0o600, now); err != nil {
-				return err
-			}
+		cfg := l.OpencodeConfig(p.Name)
+		data, err := os.ReadFile(cfg)
+		if err != nil {
+			return fmt.Errorf("profile %q missing opencode config at %s: %w", p.Name, cfg, err)
+		}
+		for _, w := range scanInlineSecrets(data) {
+			fmt.Fprintf(logw, "warning: %s %s: %s\n", p.Name, filepath.Base(cfg), w)
+		}
+		if err := zipBytes(zw, base+filepath.Base(cfg), data, 0o600, now); err != nil {
+			return err
 		}
 		if data, err := os.ReadFile(l.AgentsMD(p.Name)); err == nil {
 			if err := zipBytes(zw, base+"AGENTS.md", data, 0o644, now); err != nil {

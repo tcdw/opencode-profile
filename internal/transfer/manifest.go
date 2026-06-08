@@ -20,7 +20,7 @@ const (
 	manifestName = "manifest.json"
 	secretsName  = "secrets.enc"
 	sharedPrefix = "shared/"   // shared/skills/... travels in plaintext
-	profPrefix   = "profiles/" // profiles/<name>/{opencode.json,AGENTS.md,skills/...}
+	profPrefix   = "profiles/" // profiles/<name>/{opencode.json[c],AGENTS.md,skills/...}
 )
 
 // secretsMode values for Manifest.Secrets.Mode.

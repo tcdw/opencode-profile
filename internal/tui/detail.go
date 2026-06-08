@@ -37,7 +37,7 @@ func newDetail(l paths.Layout, name string) detailModel {
 	return detailModel{
 		layout: l,
 		name:   name,
-		model:  ocfg.GetModel(l.OpencodeJSON(name)),
+		model:  ocfg.GetModel(l.OpencodeConfig(name)),
 		input:  in,
 	}
 }
@@ -97,7 +97,7 @@ func (m detailModel) updateEditing(msg tea.Msg) (detailModel, tea.Cmd) {
 			return m, nil
 		case "enter":
 			val := strings.TrimSpace(m.input.Value())
-			if err := ocfg.SetModel(m.layout.OpencodeJSON(m.name), val); err != nil {
+			if err := ocfg.SetModel(m.layout.OpencodeConfig(m.name), val); err != nil {
 				m.status = "set model failed: " + err.Error()
 			} else {
 				m.model = val

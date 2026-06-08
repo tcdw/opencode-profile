@@ -225,6 +225,9 @@ func Path(l paths.Layout, args []string) error {
 	fmt.Printf("export XDG_DATA_HOME=%q\n", l.ProfileData(name))
 	fmt.Printf("export XDG_STATE_HOME=%q\n", l.ProfileState(name))
 	fmt.Printf("export XDG_CACHE_HOME=%q\n", l.ProfileCache(name))
+	fmt.Printf("export OPENCODE_CONFIG_DIR=%q\n", l.ProfileConfigOpencode(name))
+	fmt.Printf("export OPENCODE_CONFIG=%q\n", l.OpencodeConfig(name))
+	fmt.Printf("export OPENCODE_DB=%q\n", l.ProfileDB(name))
 	return nil
 }
 

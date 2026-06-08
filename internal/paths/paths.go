@@ -10,6 +10,11 @@ import (
 	"path/filepath"
 )
 
+const (
+	OpencodeJSONName  = "opencode.json"
+	OpencodeJSONCName = "opencode.jsonc"
+)
+
 // Layout is rooted at the ocp store directory (default ~/.opencode-profiles,
 // overridable via $OCP_HOME). All other paths derive from Root.
 type Layout struct {
@@ -59,7 +64,13 @@ func (l Layout) ProfileDataOpencode(name string) string {
 	return filepath.Join(l.ProfileData(name), "opencode")
 }
 func (l Layout) OpencodeJSON(name string) string {
-	return filepath.Join(l.ProfileConfigOpencode(name), "opencode.json")
+	return filepath.Join(l.ProfileConfigOpencode(name), OpencodeJSONName)
+}
+func (l Layout) OpencodeJSONC(name string) string {
+	return filepath.Join(l.ProfileConfigOpencode(name), OpencodeJSONCName)
+}
+func (l Layout) OpencodeConfig(name string) string {
+	return existingOrDefault(l.OpencodeJSON(name), l.OpencodeJSONC(name))
 }
 func (l Layout) AgentsMD(name string) string {
 	return filepath.Join(l.ProfileConfigOpencode(name), "AGENTS.md")
@@ -72,6 +83,9 @@ func (l Layout) ProfileAuth(name string) string {
 }
 func (l Layout) ProfileMCPAuth(name string) string {
 	return filepath.Join(l.ProfileDataOpencode(name), "mcp-auth.json")
+}
+func (l Layout) ProfileDB(name string) string {
+	return filepath.Join(l.ProfileDataOpencode(name), "opencode.db")
 }
 
 // --- live opencode dirs (read-only; used only for seeding) ---
@@ -98,12 +112,27 @@ func xdgDataHome() string {
 func (l Layout) LiveConfigOpencode() string { return filepath.Join(xdgConfigHome(), "opencode") }
 func (l Layout) LiveDataOpencode() string   { return filepath.Join(xdgDataHome(), "opencode") }
 func (l Layout) LiveOpencodeJSON() string {
-	return filepath.Join(l.LiveConfigOpencode(), "opencode.json")
+	return filepath.Join(l.LiveConfigOpencode(), OpencodeJSONName)
+}
+func (l Layout) LiveOpencodeJSONC() string {
+	return filepath.Join(l.LiveConfigOpencode(), OpencodeJSONCName)
+}
+func (l Layout) LiveOpencodeConfig() string {
+	return existingOrDefault(l.LiveOpencodeJSON(), l.LiveOpencodeJSONC())
 }
 func (l Layout) LiveAgentsMD() string { return filepath.Join(l.LiveConfigOpencode(), "AGENTS.md") }
 func (l Layout) LiveSkills() string   { return filepath.Join(l.LiveConfigOpencode(), "skills") }
 func (l Layout) LiveAuth() string     { return filepath.Join(l.LiveDataOpencode(), "auth.json") }
 func (l Layout) LiveMCPAuth() string  { return filepath.Join(l.LiveDataOpencode(), "mcp-auth.json") }
+
+func existingOrDefault(jsonPath, jsoncPath string) string {
+	for _, p := range []string{jsoncPath, jsonPath} {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			return p
+		}
+	}
+	return jsonPath
+}
 
 // FindOpencode locates the opencode binary: PATH first, then the well-known
 // install location, returning an absolute path suitable for syscall.Exec.

@@ -1,5 +1,7 @@
 /ocp
 /opencode-profile
+/opencode-profile.exe
 *.out
 /dist
 /RELEASE_NOTES.md
+/.gocache
