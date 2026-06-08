@@ -36,7 +36,8 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
-# Release notes come from CHANGELOG.md via ffurrer2/extract-release-notes
-# (passed to `goreleaser release --release-notes`), so skip the git-log changelog.
-changelog:
-  disable: true
+# Release notes are supplied via `goreleaser release --release-notes=RELEASE_NOTES.md`
+# (extracted from CHANGELOG.md by ffurrer2/extract-release-notes in CI). GoReleaser
+# reads that file INSIDE the changelog pipe and short-circuits its own git-log
+# generation, so the pipe must stay enabled — do NOT set `changelog.disable: true`,
+# or the pipe is skipped and the release body comes out empty.
