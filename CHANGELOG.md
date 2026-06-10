@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-10
+
 ### Changed
 
 - `ocp run` no longer overrides `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, or `XDG_CACHE_HOME` in the child environment. Only `OPENCODE_CONFIG_DIR`, `OPENCODE_CONFIG`, and `OPENCODE_DB` are set. This restores access to third-party tools (glab, gh, etc.) that rely on XDG directories for their own authentication tokens.
@@ -65,7 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared base with per-domain override (linked symlink vs. owned copy), an interactive TUI picker and a CLI (`run`/`list`/`create`/`rm`/`path`/`init`), surgical `opencode.json` edits via gjson/sjson, and a built-in `default` profile that runs against the live config.
 - GoReleaser configuration and a tag-triggered release workflow.
 
-[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tcdw/opencode-profile/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tcdw/opencode-profile/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tcdw/opencode-profile/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/tcdw/opencode-profile/compare/v0.1.0...v0.1.1
