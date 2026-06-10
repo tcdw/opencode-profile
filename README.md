@@ -25,6 +25,21 @@ their own tokens in the standard `~/.config` paths.
 | MCP servers | `config/opencode/opencode.json[c]` → `mcp` | `OPENCODE_CONFIG` |
 | Session DB | `data/opencode/opencode.db` | `OPENCODE_DB` |
 
+### Isolation caveats
+
+OpenCode merges config files with a **shallow merge**, not a full replacement. This means any object-type key (`mcp`, `provider`, `agent`, `command`, `permission`, `tools`, etc.) defined in your global `~/.config/opencode/opencode.json` will **leak into every profile** and get merged with whatever the profile itself declares.
+
+This is the same for the `agents/`, `commands/`, `skills/`, and `plugins/` directories under `~/.config/opencode/` — they are combined with the profile-specific directories.
+
+The safest way to avoid this is to **treat `~/.config/opencode/` as unmanaged** after you start using `ocp`:
+
+1. Run `ocp init` to seed the shared store from your existing global config.
+2. Create profiles from that shared base (`ocp create <name>`).
+3. **Clear or delete** `~/.config/opencode/opencode.json` (and any `tui.json`) so there is no global fallback to merge with.
+4. Keep only truly machine-wide settings in the global config (e.g., shell path) that you want every profile to inherit.
+
+> If you must keep a global `opencode.json`, be aware that every object key inside it will silently merge with all your profiles. You can inspect the effective config at any time with `opencode debug config`.
+
 ### Shared base + per-domain override
 
 A `shared/` store holds `auth.json`, `mcp-auth.json`, and `skills/`. By default
