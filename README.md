@@ -11,19 +11,18 @@ profile" side by side, sharing the same API keys.
 
 ## How isolation works
 
-opencode follows the XDG base-dir spec and also supports explicit `OPENCODE_*`
-path overrides. `ocp` launches it with `XDG_CONFIG_HOME` / `XDG_DATA_HOME`
-(and state/cache) pointed inside a profile, plus `OPENCODE_CONFIG_DIR`,
-`OPENCODE_CONFIG`, and `OPENCODE_DB` for the paths opencode exposes directly.
-That keeps config and data isolated without touching your live
-`~/.config/opencode` or `~/.local/share/opencode`.
+opencode supports explicit `OPENCODE_*` path overrides for config, database,
+and related directories. `ocp` launches it with `OPENCODE_CONFIG_DIR`,
+`OPENCODE_CONFIG`, and `OPENCODE_DB` pointed at the profile's directories while
+leaving XDG variables unchanged — so tools like `glab` and `gh` keep finding
+their own tokens in the standard `~/.config` paths.
 
-| Isolated thing | Lives in | Travels via |
+| Isolated thing | Lives in | Via |
 |---|---|---|
-| API keys | `data/opencode/auth.json`, `mcp-auth.json` | `XDG_DATA_HOME` |
-| System prompt | `config/opencode/AGENTS.md` | `XDG_CONFIG_HOME` |
-| Skills | `config/opencode/skills/` | `XDG_CONFIG_HOME` |
-| MCP servers | `config/opencode/opencode.json[c]` → `mcp` | `XDG_CONFIG_HOME` |
+| API keys | `data/opencode/auth.json`, `mcp-auth.json` | `OPENCODE_CONFIG_DIR` |
+| System prompt | `config/opencode/AGENTS.md` | `OPENCODE_CONFIG_DIR` |
+| Skills | `config/opencode/skills/` | `OPENCODE_CONFIG_DIR` |
+| MCP servers | `config/opencode/opencode.json[c]` → `mcp` | `OPENCODE_CONFIG` |
 | Session DB | `data/opencode/opencode.db` | `OPENCODE_DB` |
 
 ### Shared base + per-domain override
