@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-10
+
+### Changed
+
+- `ocp run` on unix now launches opencode as a child process instead of replacing the current process via `syscall.Exec`. Signals (SIGINT, SIGTERM, SIGQUIT, SIGHUP) are forwarded to the child, and stdio is inherited as before. This enables post-exit housekeeping that was impossible when ocp ceased to exist after launch.
+
+### Added
+
+- Post-exit credential sync: after opencode exits, any providers written to the XDG default data directory (`~/.local/share/opencode/auth.json`, `mcp-auth.json`) are merged back into the profile's auth files. This fixes the long-standing issue where `opencode auth login` and `/connect` would write credentials to the system-wide location instead of the profile, since opencode resolves its auth path from `XDG_DATA_HOME` rather than `OPENCODE_CONFIG_DIR`. Symlinked (linked-mode) profiles sync through to the shared base automatically.
+
 ## [0.4.0] - 2026-06-10
 
 ### Changed
@@ -67,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared base with per-domain override (linked symlink vs. owned copy), an interactive TUI picker and a CLI (`run`/`list`/`create`/`rm`/`path`/`init`), surgical `opencode.json` edits via gjson/sjson, and a built-in `default` profile that runs against the live config.
 - GoReleaser configuration and a tag-triggered release workflow.
 
-[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/tcdw/opencode-profile/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tcdw/opencode-profile/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tcdw/opencode-profile/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tcdw/opencode-profile/compare/v0.1.1...v0.2.0
