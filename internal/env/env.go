@@ -9,15 +9,12 @@ import (
 	"github.com/tcdw/opencode-profile/internal/paths"
 )
 
-// BuildEnv returns os.Environ() with XDG and opencode-specific paths overridden
-// to point at the named profile. The explicit OPENCODE_* values make config and
-// database selection robust across platforms and opencode runtime changes.
+// BuildEnv returns os.Environ() with opencode-specific paths overridden to
+// point at the named profile. XDG variables are intentionally left untouched so
+// that tools launched from within opencode (glab, gh, etc.) can still find
+// their own tokens and configuration in the standard XDG directories.
 func BuildEnv(l paths.Layout, name string) []string {
 	overrides := map[string]string{
-		"XDG_CONFIG_HOME":     l.ProfileConfig(name),
-		"XDG_DATA_HOME":       l.ProfileData(name),
-		"XDG_STATE_HOME":      l.ProfileState(name),
-		"XDG_CACHE_HOME":      l.ProfileCache(name),
 		"OPENCODE_CONFIG_DIR": l.ProfileConfigOpencode(name),
 		"OPENCODE_CONFIG":     l.OpencodeConfig(name),
 		"OPENCODE_DB":         l.ProfileDB(name),

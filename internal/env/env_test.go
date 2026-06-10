@@ -20,24 +20,11 @@ func toMap(env []string) map[string]string {
 	return m
 }
 
-func TestBuildEnvOverridesXDG(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "/old/config")
+func TestBuildEnvOverridesOpencode(t *testing.T) {
 	t.Setenv("OCP_SENTINEL", "keep-me")
 	l := paths.Layout{Root: "/root"}
 	got := toMap(BuildEnv(l, "work"))
 
-	if got["XDG_CONFIG_HOME"] != l.ProfileConfig("work") {
-		t.Errorf("XDG_CONFIG_HOME = %q, want %q", got["XDG_CONFIG_HOME"], l.ProfileConfig("work"))
-	}
-	if got["XDG_DATA_HOME"] != l.ProfileData("work") {
-		t.Errorf("XDG_DATA_HOME = %q, want %q", got["XDG_DATA_HOME"], l.ProfileData("work"))
-	}
-	if got["XDG_STATE_HOME"] != l.ProfileState("work") {
-		t.Errorf("XDG_STATE_HOME = %q", got["XDG_STATE_HOME"])
-	}
-	if got["XDG_CACHE_HOME"] != l.ProfileCache("work") {
-		t.Errorf("XDG_CACHE_HOME = %q", got["XDG_CACHE_HOME"])
-	}
 	if got["OPENCODE_CONFIG_DIR"] != l.ProfileConfigOpencode("work") {
 		t.Errorf("OPENCODE_CONFIG_DIR = %q, want %q", got["OPENCODE_CONFIG_DIR"], l.ProfileConfigOpencode("work"))
 	}
@@ -48,7 +35,21 @@ func TestBuildEnvOverridesXDG(t *testing.T) {
 		t.Errorf("OPENCODE_DB = %q, want %q", got["OPENCODE_DB"], l.ProfileDB("work"))
 	}
 	if got["OCP_SENTINEL"] != "keep-me" {
-		t.Error("non-XDG env not preserved")
+		t.Error("existing env not preserved")
+	}
+}
+
+func TestBuildEnvPreservesXDG(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/original/config")
+	t.Setenv("XDG_DATA_HOME", "/original/data")
+	l := paths.Layout{Root: "/root"}
+	got := toMap(BuildEnv(l, "work"))
+
+	if got["XDG_CONFIG_HOME"] != "/original/config" {
+		t.Errorf("XDG_CONFIG_HOME = %q, want /original/config (should not be overridden)", got["XDG_CONFIG_HOME"])
+	}
+	if got["XDG_DATA_HOME"] != "/original/data" {
+		t.Errorf("XDG_DATA_HOME = %q, want /original/data (should not be overridden)", got["XDG_DATA_HOME"])
 	}
 }
 
@@ -69,16 +70,16 @@ func TestBuildEnvUsesExistingJSONCConfig(t *testing.T) {
 	}
 }
 
-func TestBuildEnvNoDuplicateXDG(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "/old/config")
+func TestBuildEnvNoDuplicateOpencode(t *testing.T) {
+	t.Setenv("OPENCODE_CONFIG", "/old/config")
 	count := 0
 	for _, kv := range BuildEnv(paths.Layout{Root: "/root"}, "x") {
-		if strings.HasPrefix(kv, "XDG_CONFIG_HOME=") {
+		if strings.HasPrefix(kv, "OPENCODE_CONFIG=") {
 			count++
 		}
 	}
 	if count != 1 {
-		t.Errorf("XDG_CONFIG_HOME appears %d times, want 1 (pre-existing value must be stripped)", count)
+		t.Errorf("OPENCODE_CONFIG appears %d times, want 1 (pre-existing value must be stripped)", count)
 	}
 }
 

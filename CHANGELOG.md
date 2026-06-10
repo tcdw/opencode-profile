@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `ocp run` no longer overrides `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, or `XDG_CACHE_HOME` in the child environment. Only `OPENCODE_CONFIG_DIR`, `OPENCODE_CONFIG`, and `OPENCODE_DB` are set. This restores access to third-party tools (glab, gh, etc.) that rely on XDG directories for their own authentication tokens.
+
 ## [0.3.0] - 2026-06-08
 
 ### Added

@@ -31,7 +31,7 @@ const (
 var AllDomains = []Domain{DomainAuth, DomainMCPAuth, DomainSkills}
 
 // ReservedDefault is the synthetic profile that runs opencode against the live
-// dirs with no XDG override. It is never stored in profiles.json.
+// dirs with no override. It is never stored in profiles.json.
 const ReservedDefault = "default"
 
 // Profile is one isolated opencode environment. Modes is the source of truth

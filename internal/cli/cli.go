@@ -214,7 +214,7 @@ func Path(l paths.Layout, args []string) error {
 	}
 	name := args[0]
 	if name == store.ReservedDefault {
-		fmt.Println("# default profile uses live dirs; no XDG overrides needed")
+		fmt.Println("# default profile uses live dirs; no overrides needed")
 		return nil
 	}
 	s, err := store.Open(l)
@@ -224,10 +224,6 @@ func Path(l paths.Layout, args []string) error {
 	if _, err := s.Get(name); err != nil {
 		return err
 	}
-	fmt.Printf("export XDG_CONFIG_HOME=%q\n", l.ProfileConfig(name))
-	fmt.Printf("export XDG_DATA_HOME=%q\n", l.ProfileData(name))
-	fmt.Printf("export XDG_STATE_HOME=%q\n", l.ProfileState(name))
-	fmt.Printf("export XDG_CACHE_HOME=%q\n", l.ProfileCache(name))
 	fmt.Printf("export OPENCODE_CONFIG_DIR=%q\n", l.ProfileConfigOpencode(name))
 	fmt.Printf("export OPENCODE_CONFIG=%q\n", l.OpencodeConfig(name))
 	fmt.Printf("export OPENCODE_DB=%q\n", l.ProfileDB(name))
@@ -252,7 +248,7 @@ USAGE:
   ocp rm <name>            delete a profile
   ocp export [names...]    write an encrypted .zip bundle (-o out.zip; all if no names)
   ocp import <bundle.zip>  restore profiles from a bundle (--force to overwrite)
-  ocp path <name>          print export lines for the profile's XDG dirs
+  ocp path <name>          print export lines for the profile's opencode dirs
   ocp init                 initialize the store and seed the shared base
   ocp -v | --version       print version
   ocp -h | --help          show this help

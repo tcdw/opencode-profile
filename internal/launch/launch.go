@@ -20,7 +20,7 @@ type Plan struct {
 
 // BuildPlan resolves the opencode binary and assembles the child environment.
 // The reserved "default" profile (or an empty name) runs against the live dirs
-// with no XDG override.
+// with no override.
 func BuildPlan(l paths.Layout, name string, extraArgs []string) (*Plan, error) {
 	bin, err := paths.FindOpencode()
 	if err != nil {
