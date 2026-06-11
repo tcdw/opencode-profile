@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ocp acp <name>` launches `opencode acp` under a profile, and `ocp zed [names...]` prints a Zed `agent_servers` snippet that uses the profiled ACP entrypoint. With no names, `ocp zed` emits entries for every profile plus the built-in `default` profile.
+
 ## [0.5.0] - 2026-06-10
 
 ### Changed

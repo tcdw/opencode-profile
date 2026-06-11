@@ -83,14 +83,53 @@ CLI:
 
 ```sh
 ocp run <name> [-- opencode args]   # launch directly (good for shell aliases)
+ocp acp <name> [-- opencode args]   # launch OpenCode ACP under a profile
 ocp list                            # list profiles
 ocp create <name> [-desc ..] [-blank]
 ocp rm <name>
 ocp export [names...] [-o b.zip]    # encrypted, portable bundle (all profiles if none named)
 ocp import <bundle.zip> [--force]   # restore into the current store
 ocp path <name>                     # print export lines: eval "$(ocp path work)"
+ocp zed [names...]                  # print a Zed agent_servers snippet for ACP
 ocp init                            # create the store, seed shared from current config
 ```
+
+## Zed / ACP
+
+OpenCode's ACP setup normally asks Zed to run `opencode acp` directly. With
+profiles, point Zed at `ocp` instead so the profile environment is applied before
+OpenCode starts.
+
+Generate a ready-to-paste snippet for every profile:
+
+```sh
+ocp zed
+```
+
+Or generate entries for specific profiles:
+
+```sh
+ocp zed work personal
+```
+
+Add the printed JSON under `agent_servers` in `~/.config/zed/settings.json`. It
+will look like this:
+
+```json
+{
+  "agent_servers": {
+    "OpenCode (work)": {
+      "type": "custom",
+      "command": "/absolute/path/to/ocp",
+      "args": ["acp", "work"]
+    }
+  }
+}
+```
+
+Create one entry per profile, then choose the matching OpenCode agent from
+Zed's agent panel. Use the generated absolute `command` path because GUI apps may
+not inherit your shell `PATH`.
 
 ## Moving profiles between machines
 

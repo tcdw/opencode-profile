@@ -67,6 +67,10 @@ func dispatch(args []string, l paths.Layout) (*launch.Plan, error) {
 		return nil, cli.Path(l, args[1:])
 	case "run":
 		return cli.Run(l, args[1:])
+	case "acp":
+		return cli.ACP(l, args[1:])
+	case "zed":
+		return nil, cli.Zed(l, args[1:])
 	case "-h", "--help", "help":
 		cli.Usage()
 		return nil, nil

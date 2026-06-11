@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -106,6 +107,18 @@ func Run(l paths.Layout, args []string) (*launch.Plan, error) {
 	if name == "" {
 		return nil, fmt.Errorf("usage: ocp run <name> [-- opencode args]")
 	}
+	return profilePlan(l, name, extra)
+}
+
+func ACP(l paths.Layout, args []string) (*launch.Plan, error) {
+	name, extra := splitArgs(args)
+	if name == "" {
+		return nil, fmt.Errorf("usage: ocp acp <name> [-- opencode acp args]")
+	}
+	return profilePlan(l, name, append([]string{"acp"}, extra...))
+}
+
+func profilePlan(l paths.Layout, name string, extra []string) (*launch.Plan, error) {
 	if name != store.ReservedDefault {
 		s, err := store.Open(l)
 		if err != nil {
@@ -116,6 +129,29 @@ func Run(l paths.Layout, args []string) (*launch.Plan, error) {
 		}
 	}
 	return launch.BuildPlan(l, name, extra)
+}
+
+func Zed(l paths.Layout, args []string) error {
+	names := args
+	if len(names) == 0 {
+		all, err := zedProfileNames(l)
+		if err != nil {
+			return err
+		}
+		names = all
+	} else if err := validateProfiles(l, names); err != nil {
+		return err
+	}
+	cmd, err := ocpCommandPath()
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(zedSettings(cmd, names), "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
 }
 
 // Export writes a portable, encrypted bundle of one or more profiles.
@@ -243,12 +279,14 @@ func Usage() {
 USAGE:
   ocp                      launch the TUI profile picker
   ocp run <name> [-- ...]  launch opencode under a profile (extra args pass through)
+  ocp acp <name>           launch opencode ACP under a profile
   ocp list | ls            list profiles
   ocp create <name>        create a profile (-desc, -blank)
   ocp rm <name>            delete a profile
   ocp export [names...]    write an encrypted .zip bundle (-o out.zip; all if no names)
   ocp import <bundle.zip>  restore profiles from a bundle (--force to overwrite)
   ocp path <name>          print export lines for the profile's opencode dirs
+  ocp zed [names...]       print a Zed agent_servers snippet for ACP
   ocp init                 initialize the store and seed the shared base
   ocp -v | --version       print version
   ocp -h | --help          show this help
@@ -269,4 +307,66 @@ func splitArgs(args []string) (name string, extra []string) {
 		extra = extra[1:]
 	}
 	return name, extra
+}
+
+type zedAgentServer struct {
+	Type    string   `json:"type"`
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+}
+
+type zedSettingsSnippet struct {
+	AgentServers map[string]zedAgentServer `json:"agent_servers"`
+}
+
+func zedSettings(command string, names []string) zedSettingsSnippet {
+	servers := make(map[string]zedAgentServer, len(names))
+	for _, name := range names {
+		servers["OpenCode ("+name+")"] = zedAgentServer{
+			Type:    "custom",
+			Command: command,
+			Args:    []string{"acp", name},
+		}
+	}
+	return zedSettingsSnippet{AgentServers: servers}
+}
+
+func ocpCommandPath() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return exe, nil
+}
+
+func zedProfileNames(l paths.Layout) ([]string, error) {
+	s, err := store.Open(l)
+	if err != nil {
+		return nil, err
+	}
+	names := []string{store.ReservedDefault}
+	for _, p := range s.Profiles {
+		names = append(names, p.Name)
+	}
+	return names, nil
+}
+
+func validateProfiles(l paths.Layout, names []string) error {
+	var s *store.Store
+	for _, name := range names {
+		if name == store.ReservedDefault {
+			continue
+		}
+		if s == nil {
+			var err error
+			s, err = store.Open(l)
+			if err != nil {
+				return err
+			}
+		}
+		if _, err := s.Get(name); err != nil {
+			return err
+		}
+	}
+	return nil
 }

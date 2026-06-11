@@ -65,14 +65,51 @@ CLI 命令：
 
 ```sh
 ocp run <name> [-- opencode args]   # 直接启动（适用于 shell alias）
+ocp acp <name> [-- opencode args]   # 在 profile 下启动 OpenCode ACP
 ocp list                            # 列出所有 profile
 ocp create <name> [-desc ..] [-blank]
 ocp rm <name>
 ocp export [names...] [-o b.zip]    # 加密便携打包（不指定名称则导出全部）
 ocp import <bundle.zip> [--force]   # 恢复到当前存储
 ocp path <name>                     # 打印 export 行：eval "$(ocp path work)"
+ocp zed [names...]                  # 打印 Zed ACP 的 agent_servers 片段
 ocp init                            # 创建存储，从当前配置播种共享数据
 ```
+
+## Zed / ACP
+
+OpenCode 的 ACP 文档通常让 Zed 直接运行 `opencode acp`。使用 profiles 时，
+应让 Zed 运行 `ocp`，这样 OpenCode 启动前就会带上对应 profile 的环境变量。
+
+为所有 profile 生成可直接粘贴的配置片段：
+
+```sh
+ocp zed
+```
+
+也可以只生成指定 profile 的条目：
+
+```sh
+ocp zed work personal
+```
+
+把输出的 JSON 合并到 `~/.config/zed/settings.json` 的 `agent_servers` 中。格式类似：
+
+```json
+{
+  "agent_servers": {
+    "OpenCode (work)": {
+      "type": "custom",
+      "command": "/absolute/path/to/ocp",
+      "args": ["acp", "work"]
+    }
+  }
+}
+```
+
+每个 profile 可以生成一个条目，然后在 Zed 的 agent panel 中选择对应的
+OpenCode agent。建议使用生成出的绝对 `command` 路径，因为 GUI 应用不一定继承
+你的 shell `PATH`。
 
 ## 跨设备迁移 profile
 
