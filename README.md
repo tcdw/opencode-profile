@@ -4,10 +4,19 @@ Isolated **profiles** for [opencode](https://opencode.ai) — switch API keys, s
 prompt, skills, and MCP servers per profile, and launch opencode under the one
 you pick.
 
-Built because a single global `AGENTS.md` can't suit every model: a stylized
-system prompt that's harmless to Claude/GPT may derail GLM/DeepSeek/Kimi/Qwen.
-With `ocp` you keep a "Claude profile" with that prompt and a clean "domestic-model
-profile" side by side, sharing the same API keys.
+## Why
+
+**Model-dependent system prompts.** A stylized `AGENTS.md` that's fine with
+Claude or GPT can derail GLM, DeepSeek, Kimi, or Qwen. Profiles let you keep a
+"Claude profile" with that prompt and a clean "domestic-model profile" side by
+side.
+
+**Provider / Gateway isolation.** Accidentally routing personal work through
+your company's AI Gateway is a mistake you want to make exactly once. Put the
+internal gateway — with per-agent model overrides like
+[#6019](https://github.com/anomalyco/opencode/issues/6019) — in one profile and
+your personal API keys in another. No config edits when switching contexts, no
+cross-contamination.
 
 ## How isolation works
 
