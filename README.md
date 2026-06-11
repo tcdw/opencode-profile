@@ -1,3 +1,5 @@
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 # opencode-profile (`ocp`)
 
 Isolated **profiles** for [opencode](https://opencode.ai) — switch API keys, system
