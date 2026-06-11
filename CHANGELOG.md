@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-11
+
 ### Added
 
 - `ocp acp <name>` launches `opencode acp` under a profile, and `ocp zed [names...]` prints a Zed `agent_servers` snippet that uses the profiled ACP entrypoint. With no names, `ocp zed` emits entries for every profile plus the built-in `default` profile.
@@ -81,7 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared base with per-domain override (linked symlink vs. owned copy), an interactive TUI picker and a CLI (`run`/`list`/`create`/`rm`/`path`/`init`), surgical `opencode.json` edits via gjson/sjson, and a built-in `default` profile that runs against the live config.
 - GoReleaser configuration and a tag-triggered release workflow.
 
-[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/tcdw/opencode-profile/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tcdw/opencode-profile/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tcdw/opencode-profile/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tcdw/opencode-profile/compare/v0.2.0...v0.3.0
