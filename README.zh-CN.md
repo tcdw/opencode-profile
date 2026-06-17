@@ -41,7 +41,19 @@ OpenCode 对配置文件采用**浅合并（shallow merge）**，而非完全替
 
 `shared/` 存储中保存着 `auth.json`、`mcp-auth.json` 和 `skills/`。默认每个 profile **符号链接**到这些基础文件（这样无需每个 profile 都重新登录），而系统提示词、模型、MCP 配置和会话数据库则按 profile 独立。任何域都可以被切换为 **owned**（独立副本）—— 也可以再切回去，旧副本会被备份，永不删除。
 
-## 构建
+## 安装
+
+### go install
+
+```sh
+go install github.com/tcdw/opencode-profile@latest
+```
+
+### GitHub Releases
+
+从 [Releases](https://github.com/tcdw/opencode-profile/releases) 页面下载预编译二进制文件。提供 macOS、Linux 和 Windows 的归档包。
+
+### 从源码构建
 
 ```sh
 go build -o ocp .

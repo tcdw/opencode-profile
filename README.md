@@ -61,7 +61,19 @@ while the system prompt, model, MCP config, and session DB stay per-profile. Any
 domain can be flipped to **owned** (an isolated copy) — and back, with the old
 copy backed up, never deleted.
 
-## Build
+## Installation
+
+### go install
+
+```sh
+go install github.com/tcdw/opencode-profile@latest
+```
+
+### GitHub Releases
+
+Download pre-built binaries from the [Releases](https://github.com/tcdw/opencode-profile/releases) page. Archives are available for macOS, Linux, and Windows.
+
+### Build from source
 
 ```sh
 go build -o ocp .
