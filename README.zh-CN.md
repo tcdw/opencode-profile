@@ -12,11 +12,11 @@
 
 ## 隔离机制
 
-opencode 支持通过 `OPENCODE_*` 环境变量显式覆盖 config、database 等目录。`ocp` 启动时会将 `OPENCODE_CONFIG_DIR`、`OPENCODE_CONFIG` 和 `OPENCODE_DB` 指向 profile 专属目录，同时保持 XDG 变量不变 —— 这样 `glab` 和 `gh` 等工具仍然能在标准的 `~/.config` 路径下找到它们自己的 token。
+opencode 支持通过 `OPENCODE_*` 环境变量显式覆盖 config、database 等目录。`ocp` 启动时会将 `OPENCODE_CONFIG_DIR`、`OPENCODE_CONFIG` 和 `OPENCODE_DB` 指向 profile 专属目录，同时保持 XDG 变量不变 —— 这样 `glab` 和 `gh` 等工具仍然能在标准的 `~/.config` 路径下找到它们自己的 token。由于 opencode 仍然从 XDG 默认数据目录解析凭据文件，`ocp` 会在启动前把 profile 的 auth 文件同步过去，并在退出后把变更合并回 profile。
 
 | 隔离项 | 所在位置 | 方式 |
 |---|---|---|
-| API keys | `data/opencode/auth.json`、`mcp-auth.json` | `OPENCODE_CONFIG_DIR` |
+| API keys | `data/opencode/auth.json`、`mcp-auth.json` | 启动/退出同步 |
 | 系统提示词 | `config/opencode/AGENTS.md` | `OPENCODE_CONFIG_DIR` |
 | Skills | `config/opencode/skills/` | `OPENCODE_CONFIG_DIR` |
 | MCP 服务器 | `config/opencode/opencode.json[c]` → `mcp` | `OPENCODE_CONFIG` |

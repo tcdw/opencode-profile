@@ -17,6 +17,7 @@ func Exec(p *Plan) error {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	runStartupSyncs(p.Syncs)
 	err := cmd.Run()
 
 	runSyncs(p.Syncs)

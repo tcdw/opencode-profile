@@ -20,10 +20,9 @@ type Plan struct {
 	Syncs []SyncPair
 }
 
-// SyncPair describes a post-exit JSON merge from the XDG default location
-// (Src) into the profile's auth file (Dst). opencode writes credentials to
-// the XDG data dir regardless of OPENCODE_CONFIG_DIR, so we reclaim them
-// after the child exits.
+// SyncPair maps the XDG default auth file (Src) to the profile's auth file
+// (Dst). opencode reads and writes credentials through XDG_DATA_HOME regardless
+// of OPENCODE_CONFIG_DIR, so launch syncs both sides around the child process.
 type SyncPair struct {
 	Src string
 	Dst string

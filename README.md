@@ -22,15 +22,17 @@ cross-contamination.
 
 ## How isolation works
 
-opencode supports explicit `OPENCODE_*` path overrides for config, database,
-and related directories. `ocp` launches it with `OPENCODE_CONFIG_DIR`,
-`OPENCODE_CONFIG`, and `OPENCODE_DB` pointed at the profile's directories while
-leaving XDG variables unchanged — so tools like `glab` and `gh` keep finding
-their own tokens in the standard `~/.config` paths.
+opencode supports explicit `OPENCODE_*` path overrides for config and database
+locations. `ocp` launches it with `OPENCODE_CONFIG_DIR`, `OPENCODE_CONFIG`, and
+`OPENCODE_DB` pointed at the profile's directories while leaving XDG variables
+unchanged — so tools like `glab` and `gh` keep finding their own tokens in the
+standard `~/.config` paths. Since opencode still resolves credential files from
+the XDG default data directory, `ocp` syncs the profile's auth files into that
+location before launch and merges changes back after exit.
 
 | Isolated thing | Lives in | Via |
 |---|---|---|
-| API keys | `data/opencode/auth.json`, `mcp-auth.json` | `OPENCODE_CONFIG_DIR` |
+| API keys | `data/opencode/auth.json`, `mcp-auth.json` | startup/exit sync |
 | System prompt | `config/opencode/AGENTS.md` | `OPENCODE_CONFIG_DIR` |
 | Skills | `config/opencode/skills/` | `OPENCODE_CONFIG_DIR` |
 | MCP servers | `config/opencode/opencode.json[c]` → `mcp` | `OPENCODE_CONFIG` |

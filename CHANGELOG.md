@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-17
+
+### Fixed
+
+- Profile auth files are now synced into opencode's XDG default data location before launch, so `auth.json` and `mcp-auth.json` managed under a profile are visible to opencode during the session. Post-exit sync still merges credentials written by opencode back into the profile.
+
 ## [0.6.0] - 2026-06-11
 
 ### Added
@@ -83,7 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared base with per-domain override (linked symlink vs. owned copy), an interactive TUI picker and a CLI (`run`/`list`/`create`/`rm`/`path`/`init`), surgical `opencode.json` edits via gjson/sjson, and a built-in `default` profile that runs against the live config.
 - GoReleaser configuration and a tag-triggered release workflow.
 
-[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/tcdw/opencode-profile/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/tcdw/opencode-profile/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tcdw/opencode-profile/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tcdw/opencode-profile/compare/v0.3.0...v0.4.0
