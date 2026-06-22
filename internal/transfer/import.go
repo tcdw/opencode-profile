@@ -327,7 +327,7 @@ func extractPrefixWithOverwrite(index map[string]*zip.File, prefix, destBase str
 			return err
 		}
 		if err := placeFile(dest, data, perm, overwrite, now); err != nil {
-			return err
+			return fmt.Errorf("extract %s: %w", dest, err)
 		}
 	}
 	return nil
