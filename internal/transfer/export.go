@@ -192,7 +192,7 @@ func addGlobalToBundle(zw *zip.Writer, l paths.Layout, now time.Time, logw io.Wr
 		}
 	}
 	if err := addTreeDerefWithSkip(zw, cfg, globalPrefix+"config/opencode/", now, func(name string) bool {
-		return name == globalPrefix+"config/opencode/skills/" || strings.HasPrefix(name, globalPrefix+"config/opencode/skills/")
+		return name == globalPrefix+"config/opencode/skills/" || strings.HasPrefix(name, globalPrefix+"config/opencode/skills/") || skipDependencyTree(name)
 	}); err != nil {
 		return err
 	}
@@ -200,11 +200,25 @@ func addGlobalToBundle(zw *zip.Writer, l paths.Layout, now time.Time, logw io.Wr
 	if err := addTreeDerefWithSkip(zw, data, globalPrefix+"data/opencode/", now, func(name string) bool {
 		return name == globalPrefix+"data/opencode/opencode.db" ||
 			name == globalPrefix+"data/opencode/auth.json" ||
-			name == globalPrefix+"data/opencode/mcp-auth.json"
+			name == globalPrefix+"data/opencode/mcp-auth.json" ||
+			skipDependencyTree(name)
 	}); err != nil {
 		return err
 	}
 	return nil
+}
+
+func skipDependencyTree(name string) bool {
+	parts := strings.Split(strings.Trim(name, "/"), "/")
+	for i, part := range parts {
+		if part == "node_modules" || part == ".pnpm" {
+			return true
+		}
+		if part == "cache" && i > 0 && parts[i-1] == ".yarn" {
+			return true
+		}
+	}
+	return false
 }
 
 // selectProfiles resolves names to profiles, or returns all when names is empty.

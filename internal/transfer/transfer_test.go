@@ -56,6 +56,8 @@ func TestRoundTrip(t *testing.T) {
 	mustWrite(t, filepath.Join(liveCfgA, "opencode", "AGENTS.md"), "jirai prompt\n")
 	mustWrite(t, filepath.Join(liveCfgA, "opencode", "tui.json"), `{"theme":"dark"}`)
 	mustWrite(t, filepath.Join(liveCfgA, "opencode", "commands", "hello.json"), `{"cmd":"hi"}`)
+	mustWrite(t, filepath.Join(liveCfgA, "opencode", "plugins", "local.ts"), "export default async () => ({})\n")
+	mustWrite(t, filepath.Join(liveCfgA, "opencode", "plugins", "node_modules", "dep", "index.js"), "module.exports = {}\n")
 	mustWrite(t, filepath.Join(liveDataA, "opencode", "auth.json"), `{"openai":{"type":"oauth"}}`)
 	mustWrite(t, filepath.Join(liveDataA, "opencode", "mcp-auth.json"), `{"notion":{"token":"x"}}`)
 	mustWrite(t, filepath.Join(liveDataA, "opencode", "extensions", "foo.json"), `{"enabled":true}`)
@@ -195,6 +197,12 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(filepath.Join(liveCfgB, "opencode", "commands", "hello.json")); string(got) != `{"cmd":"hi"}` {
 		t.Errorf("global commands/hello.json = %q", got)
+	}
+	if got, _ := os.ReadFile(filepath.Join(liveCfgB, "opencode", "plugins", "local.ts")); string(got) != "export default async () => ({})\n" {
+		t.Errorf("global plugins/local.ts = %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(liveCfgB, "opencode", "plugins", "node_modules")); !os.IsNotExist(err) {
+		t.Error("global plugin node_modules should not be imported")
 	}
 	if got, _ := os.ReadFile(filepath.Join(liveDataB, "opencode", "extensions", "foo.json")); string(got) != `{"enabled":true}` {
 		t.Errorf("global extensions/foo.json = %q", got)
