@@ -44,6 +44,15 @@ func (l Layout) SharedMCPAuth() string { return filepath.Join(l.Shared(), "mcp-a
 func (l Layout) SharedSkills() string  { return filepath.Join(l.Shared(), "skills") }
 func (l Layout) ProfilesDir() string   { return filepath.Join(l.Root, "profiles") }
 
+// --- global layout (symlinks into the live opencode dirs for easy editing) ---
+
+func (l Layout) GlobalDir() string            { return filepath.Join(l.Root, "global") }
+func (l Layout) GlobalConfigDir() string      { return filepath.Join(l.GlobalDir(), "config", "opencode") }
+func (l Layout) GlobalDataDir() string        { return filepath.Join(l.GlobalDir(), "data", "opencode") }
+func (l Layout) GlobalOpencodeJSON() string   { return filepath.Join(l.GlobalConfigDir(), OpencodeJSONName) }
+func (l Layout) GlobalOpencodeJSONC() string  { return filepath.Join(l.GlobalConfigDir(), OpencodeJSONCName) }
+func (l Layout) GlobalOpencodeConfig() string { return existingOrDefault(l.GlobalOpencodeJSON(), l.GlobalOpencodeJSONC()) }
+
 // --- per-profile layout ---
 
 func (l Layout) ProfileDir(name string) string { return filepath.Join(l.ProfilesDir(), name) }

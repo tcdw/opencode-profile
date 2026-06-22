@@ -61,6 +61,40 @@ func mustBeUnderRoot(root, path string) error {
 	return nil
 }
 
+// ensureSymlink makes target a symlink pointing at source. If the filesystem
+// refuses symlinks it creates a real directory as a fallback. Existing broken
+// or wrong symlinks are replaced.
+func ensureSymlink(source, target string) error {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	fi, err := os.Lstat(target)
+	if err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			cur, _ := os.Readlink(target)
+			if cur == source {
+				return nil
+			}
+			if err := os.Remove(target); err != nil {
+				return err
+			}
+		} else if fi.IsDir() {
+			// Fallback directory already exists; leave it alone.
+			return nil
+		} else {
+			if err := os.Remove(target); err != nil {
+				return err
+			}
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.Symlink(source, target); err != nil {
+		return os.MkdirAll(target, 0o755)
+	}
+	return nil
+}
+
 func fileExists(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && !fi.IsDir()

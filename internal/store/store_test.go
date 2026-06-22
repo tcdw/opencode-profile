@@ -142,6 +142,22 @@ func TestRemoveKeepsShared(t *testing.T) {
 	}
 }
 
+func TestGlobalLinksCreatedAtInit(t *testing.T) {
+	l, _ := setup(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink assumptions skipped on windows")
+	}
+	for _, target := range []string{l.GlobalConfigDir(), l.GlobalDataDir()} {
+		fi, err := os.Lstat(target)
+		if err != nil {
+			t.Fatalf("global link %s missing: %v", target, err)
+		}
+		if fi.Mode()&os.ModeSymlink == 0 {
+			t.Errorf("%s should be a symlink", target)
+		}
+	}
+}
+
 func TestValidateName(t *testing.T) {
 	for _, n := range []string{"default", "..", ".", "a/b", "", ".hidden", "-x", "a b"} {
 		if err := ValidateName(n); err == nil {

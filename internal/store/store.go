@@ -137,6 +137,26 @@ func (s *Store) ensureSkeleton() error {
 			return err
 		}
 	}
+	return s.ensureGlobalLinks()
+}
+
+// ensureGlobalLinks makes the OCP_HOME/global tree point at the live opencode
+// config and data dirs so users can edit them directly. On filesystems that
+// refuse symlinks it falls back to real directories (import/export still work,
+// they just write into the store instead of the live dirs).
+func (s *Store) ensureGlobalLinks() error {
+	l := s.layout
+	for _, live := range []string{l.LiveConfigOpencode(), l.LiveDataOpencode()} {
+		if err := os.MkdirAll(live, 0o755); err != nil {
+			return err
+		}
+	}
+	if err := ensureSymlink(l.LiveConfigOpencode(), l.GlobalConfigDir()); err != nil {
+		return err
+	}
+	if err := ensureSymlink(l.LiveDataOpencode(), l.GlobalDataDir()); err != nil {
+		return err
+	}
 	return nil
 }
 

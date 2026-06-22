@@ -113,6 +113,12 @@ func Import(l paths.Layout, opts ImportOpts) error {
 		}
 	}
 
+	// Global config/data: restored into the global/ symlinks (i.e. the live
+	// opencode dirs). Existing files are kept unless --force is set.
+	if err := extractGlobal(index, l, opts.Overwrite, now, logw); err != nil {
+		return err
+	}
+
 	for _, pe := range man.Profiles {
 		if err := importProfile(l, s, pe, index, secrets, man.SourceRoot, dstRoot, opts.Overwrite, logw); err != nil {
 			return err
@@ -266,11 +272,65 @@ func placeShared(path string, data []byte, overwrite bool, now time.Time, logw i
 			fmt.Fprintf(logw, "kept existing %s (use --force to overwrite)\n", filepath.Base(path))
 			return nil
 		}
+	}
+	return placeFile(path, data, 0o600, overwrite, now)
+}
+
+// placeFile writes data to path, backing up any existing file when overwrite is
+// true and leaving it untouched when overwrite is false.
+func placeFile(path string, data []byte, perm os.FileMode, overwrite bool, now time.Time) error {
+	if lexists(path) {
+		if !overwrite {
+			return nil
+		}
 		if err := os.Rename(path, fmt.Sprintf("%s.bak-%d", path, now.Unix())); err != nil {
 			return err
 		}
 	}
-	return writeFile(path, data, 0o600)
+	return writeFile(path, data, perm)
+}
+
+// extractGlobal restores the live opencode config/data pointed at by the
+// global/ symlinks. Existing files are kept unless overwrite is set.
+func extractGlobal(index map[string]*zip.File, l paths.Layout, overwrite bool, now time.Time, logw io.Writer) error {
+	if err := extractPrefixWithOverwrite(index, globalPrefix+"config/opencode/", l.GlobalConfigDir(), 0o644, overwrite, now, logw); err != nil {
+		return err
+	}
+	if err := extractPrefixWithOverwrite(index, globalPrefix+"data/opencode/", l.GlobalDataDir(), 0o600, overwrite, now, logw); err != nil {
+		return err
+	}
+	return nil
+}
+
+// extractPrefixWithOverwrite writes every non-directory zip entry under prefix
+// into destBase, preserving the sub-path and guarding against zip-slip. Existing
+// files are kept unless overwrite is set, in which case they are backed up.
+func extractPrefixWithOverwrite(index map[string]*zip.File, prefix, destBase string, perm os.FileMode, overwrite bool, now time.Time, logw io.Writer) error {
+	for name, f := range index {
+		if !strings.HasPrefix(name, prefix) || strings.HasSuffix(name, "/") {
+			continue
+		}
+		rel := name[len(prefix):]
+		if rel == "" {
+			continue
+		}
+		dest, err := safeJoin(destBase, rel)
+		if err != nil {
+			return err
+		}
+		if lexists(dest) && !overwrite {
+			fmt.Fprintf(logw, "kept existing global %s (use --force to overwrite)\n", rel)
+			continue
+		}
+		data, err := readZip(f)
+		if err != nil {
+			return err
+		}
+		if err := placeFile(dest, data, perm, overwrite, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // extractPrefix writes every non-directory zip entry under prefix into destBase,

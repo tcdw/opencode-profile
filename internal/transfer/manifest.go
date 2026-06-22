@@ -21,6 +21,7 @@ const (
 	secretsName  = "secrets.enc"
 	sharedPrefix = "shared/"   // shared/skills/... travels in plaintext
 	profPrefix   = "profiles/" // profiles/<name>/{opencode.json[c],AGENTS.md,skills/...}
+	globalPrefix = "global/"   // global/config/opencode/..., global/data/opencode/...
 )
 
 // secretsMode values for Manifest.Secrets.Mode.

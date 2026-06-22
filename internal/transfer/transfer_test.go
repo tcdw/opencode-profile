@@ -33,12 +33,14 @@ func mustWrite(t *testing.T, p, content string) {
 // portable (modes, secret contents/perms, path-ref rewriting, symlink vs copy).
 func TestRoundTrip(t *testing.T) {
 	tmp := t.TempDir()
-	liveCfg := filepath.Join(tmp, "live-config")
-	liveData := filepath.Join(tmp, "live-data")
-	t.Setenv("XDG_CONFIG_HOME", liveCfg)
-	t.Setenv("XDG_DATA_HOME", liveData)
-	mustMkdirAll(t, filepath.Join(liveCfg, "opencode"))
-	mustMkdirAll(t, filepath.Join(liveData, "opencode"))
+	liveCfgA := filepath.Join(tmp, "live-config-a")
+	liveDataA := filepath.Join(tmp, "live-data-a")
+	liveCfgB := filepath.Join(tmp, "live-config-b")
+	liveDataB := filepath.Join(tmp, "live-data-b")
+	t.Setenv("XDG_CONFIG_HOME", liveCfgA)
+	t.Setenv("XDG_DATA_HOME", liveDataA)
+	mustMkdirAll(t, filepath.Join(liveCfgA, "opencode"))
+	mustMkdirAll(t, filepath.Join(liveDataA, "opencode"))
 
 	rootA := filepath.Join(tmp, "store-a")
 	rootB := filepath.Join(tmp, "store-b")
@@ -50,10 +52,13 @@ func TestRoundTrip(t *testing.T) {
 	ref := "{file:" + absA + "/shared/rightcapital.key}"
 	liveJSON := `{"model":"prov/m","provider":{"x":{"options":{"apiKey":"` + ref +
 		`"}}},"mcp":{"figma":{"type":"remote","headers":{"Authorization":"Bearer ` + ref + `"}}}}` + "\n"
-	mustWrite(t, filepath.Join(liveCfg, "opencode", "opencode.json"), liveJSON)
-	mustWrite(t, filepath.Join(liveCfg, "opencode", "AGENTS.md"), "jirai prompt\n")
-	mustWrite(t, filepath.Join(liveData, "opencode", "auth.json"), `{"openai":{"type":"oauth"}}`)
-	mustWrite(t, filepath.Join(liveData, "opencode", "mcp-auth.json"), `{"notion":{"token":"x"}}`)
+	mustWrite(t, filepath.Join(liveCfgA, "opencode", "opencode.json"), liveJSON)
+	mustWrite(t, filepath.Join(liveCfgA, "opencode", "AGENTS.md"), "jirai prompt\n")
+	mustWrite(t, filepath.Join(liveCfgA, "opencode", "tui.json"), `{"theme":"dark"}`)
+	mustWrite(t, filepath.Join(liveCfgA, "opencode", "commands", "hello.json"), `{"cmd":"hi"}`)
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "auth.json"), `{"openai":{"type":"oauth"}}`)
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "mcp-auth.json"), `{"notion":{"token":"x"}}`)
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "extensions", "foo.json"), `{"enabled":true}`)
 
 	lA := paths.Layout{Root: rootA}
 	sA, err := store.Open(lA)
@@ -90,6 +95,9 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	lB := paths.Layout{Root: rootB}
+	// Point the destination global symlinks at a fresh pair of live dirs.
+	t.Setenv("XDG_CONFIG_HOME", liveCfgB)
+	t.Setenv("XDG_DATA_HOME", liveDataB)
 	if err := Import(lB, ImportOpts{Bundle: bundle, Passphrase: "pw", Now: now}); err != nil {
 		t.Fatal(err)
 	}
@@ -179,6 +187,28 @@ func TestRoundTrip(t *testing.T) {
 	// The session DB is never carried.
 	if _, err := os.Stat(filepath.Join(lB.ProfileDataOpencode("alpha"), "opencode.db")); !os.IsNotExist(err) {
 		t.Error("opencode.db should not be imported")
+	}
+
+	// Global config/data travels in plaintext (minus shared-managed entries and DB).
+	if got, _ := os.ReadFile(filepath.Join(liveCfgB, "opencode", "tui.json")); string(got) != `{"theme":"dark"}` {
+		t.Errorf("global tui.json = %q", got)
+	}
+	if got, _ := os.ReadFile(filepath.Join(liveCfgB, "opencode", "commands", "hello.json")); string(got) != `{"cmd":"hi"}` {
+		t.Errorf("global commands/hello.json = %q", got)
+	}
+	if got, _ := os.ReadFile(filepath.Join(liveDataB, "opencode", "extensions", "foo.json")); string(got) != `{"enabled":true}` {
+		t.Errorf("global extensions/foo.json = %q", got)
+	}
+
+	// Shared-managed files must not be duplicated into the global tree.
+	if _, err := os.Stat(filepath.Join(liveDataB, "opencode", "auth.json")); !os.IsNotExist(err) {
+		t.Error("global auth.json should not be imported (it lives in shared)")
+	}
+	if _, err := os.Stat(filepath.Join(liveCfgB, "opencode", "skills")); !os.IsNotExist(err) {
+		t.Error("global skills/ should not be imported (it lives in shared)")
+	}
+	if _, err := os.Stat(filepath.Join(liveDataB, "opencode", "opencode.db")); !os.IsNotExist(err) {
+		t.Error("global opencode.db should not be imported")
 	}
 }
 

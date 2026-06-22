@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/tcdw/opencode-profile/internal/paths"
@@ -162,6 +163,11 @@ func writeBundle(zw *zip.Writer, l paths.Layout, man Manifest, selected []store.
 		}
 	}
 
+	// Plaintext: global opencode config and data (follows the global/ symlinks).
+	if err := addGlobalToBundle(zw, l, now, logw); err != nil {
+		return err
+	}
+
 	// Encrypted: tar of every secret file, sealed under the passphrase.
 	tarBytes, err := buildSecretsTar(items)
 	if err != nil {
@@ -172,6 +178,33 @@ func writeBundle(zw *zip.Writer, l paths.Layout, man Manifest, selected []store.
 		return err
 	}
 	return zipBytes(zw, secretsName, blob, 0o600, now)
+}
+
+// addGlobalToBundle packs the live opencode config/data dirs pointed at by the
+// global/ symlinks. Entries already managed by the shared base (skills, auth,
+// mcp-auth) and the session DB are skipped so the bundle stays small and the
+// shared/profile layers remain authoritative.
+func addGlobalToBundle(zw *zip.Writer, l paths.Layout, now time.Time, logw io.Writer) error {
+	cfg := l.GlobalConfigDir()
+	if data, err := os.ReadFile(l.GlobalOpencodeConfig()); err == nil {
+		for _, w := range scanInlineSecrets(data) {
+			fmt.Fprintf(logw, "warning: global %s: %s\n", filepath.Base(l.GlobalOpencodeConfig()), w)
+		}
+	}
+	if err := addTreeDerefWithSkip(zw, cfg, globalPrefix+"config/opencode/", now, func(name string) bool {
+		return name == globalPrefix+"config/opencode/skills/" || strings.HasPrefix(name, globalPrefix+"config/opencode/skills/")
+	}); err != nil {
+		return err
+	}
+	data := l.GlobalDataDir()
+	if err := addTreeDerefWithSkip(zw, data, globalPrefix+"data/opencode/", now, func(name string) bool {
+		return name == globalPrefix+"data/opencode/opencode.db" ||
+			name == globalPrefix+"data/opencode/auth.json" ||
+			name == globalPrefix+"data/opencode/mcp-auth.json"
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // selectProfiles resolves names to profiles, or returns all when names is empty.
@@ -256,6 +289,12 @@ func buildSecretsTar(items []secretItem) ([]byte, error) {
 // result is self-contained (skill entries are often symlinks into a store).
 // A missing root or a dangling link is skipped, not an error.
 func addTreeDeref(zw *zip.Writer, diskDir, zipPrefix string, now time.Time) error {
+	return addTreeDerefWithSkip(zw, diskDir, zipPrefix, now, nil)
+}
+
+// addTreeDerefWithSkip is like addTreeDeref but lets the caller omit individual
+// entries by zip name (e.g. the session DB under the global data dir).
+func addTreeDerefWithSkip(zw *zip.Writer, diskDir, zipPrefix string, now time.Time, skip func(string) bool) error {
 	entries, err := os.ReadDir(diskDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -266,12 +305,15 @@ func addTreeDeref(zw *zip.Writer, diskDir, zipPrefix string, now time.Time) erro
 	for _, e := range entries {
 		disk := filepath.Join(diskDir, e.Name())
 		name := zipPrefix + e.Name()
+		if skip != nil && skip(name) {
+			continue
+		}
 		fi, err := os.Stat(disk) // follow symlinks
 		if err != nil {
 			continue // dangling link or vanished entry
 		}
 		if fi.IsDir() {
-			if err := addTreeDeref(zw, disk, name+"/", now); err != nil {
+			if err := addTreeDerefWithSkip(zw, disk, name+"/", now, skip); err != nil {
 				return err
 			}
 			continue
