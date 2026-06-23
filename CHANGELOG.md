@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-23
+
 ### Added
 
 - `ocp init` now creates `global/config/opencode` and `global/data/opencode` symlinks inside the store, pointing at the live opencode directories (`~/.config/opencode` and `~/.local/share/opencode`) so they can be edited directly from the store.
@@ -94,7 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared base with per-domain override (linked symlink vs. owned copy), an interactive TUI picker and a CLI (`run`/`list`/`create`/`rm`/`path`/`init`), surgical `opencode.json` edits via gjson/sjson, and a built-in `default` profile that runs against the live config.
 - GoReleaser configuration and a tag-triggered release workflow.
 
-[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/tcdw/opencode-profile/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/tcdw/opencode-profile/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/tcdw/opencode-profile/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/tcdw/opencode-profile/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tcdw/opencode-profile/compare/v0.4.0...v0.5.0
