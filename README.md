@@ -150,9 +150,9 @@ not inherit your shell `PATH`.
 `ocp export` writes a single self-contained `.zip` you can carry anywhere (e.g.
 to a Windows box). The bundle is portable by design:
 
-- **Config travels in plaintext** — `opencode.json`/`opencode.jsonc`, `AGENTS.md`, skills, and the
-  live/global opencode config (`~/.config/opencode/`) and data (`~/.local/share/opencode/`) are
-  readable/diffable inside the zip.
+- **Config travels in plaintext** — `opencode.json`/`opencode.jsonc`, `AGENTS.md`, skills, the
+  live/global opencode config (`~/.config/opencode/`), and portable global data such as
+  `extensions/` are readable/diffable inside the zip.
 - **Secrets are encrypted** — `auth.json`, `mcp-auth.json`, and any `*.key`
   are packed into one `secrets.enc` blob (AES-256-GCM, key derived from your
   passphrase via PBKDF2). You're prompted for a passphrase, or set
@@ -161,9 +161,10 @@ to a Windows box). The bundle is portable by design:
   metadata and rebuilt on import (a `linked` domain that can't be symlinked,
   e.g. on Windows without privilege, degrades to an owned copy). Absolute
   `{file:...}` references in opencode config are rewritten to the new machine's
-  store root. The session DB, caches, `.bak` files, and shared-managed entries
-  (`skills/`, `auth.json`, `mcp-auth.json`) are never duplicated in the global
-  portion of the bundle.
+  store root. Session/runtime data (`opencode.db*`, `snapshot/`, `storage/`,
+  `tool-output/`, `log/`, `bin/`), dependency trees, `.bak` files, and
+  shared-managed entries (`skills/`, `auth.json`, `mcp-auth.json`) are never
+  duplicated in the global portion of the bundle.
 
 ```sh
 ocp export -o work.zip                 # bundle every profile

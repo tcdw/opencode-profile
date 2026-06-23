@@ -163,7 +163,7 @@ func writeBundle(zw *zip.Writer, l paths.Layout, man Manifest, selected []store.
 		}
 	}
 
-	// Plaintext: global opencode config and data (follows the global/ symlinks).
+	// Plaintext: global opencode config and portable data (follows the global/ symlinks).
 	if err := addGlobalToBundle(zw, l, now, logw); err != nil {
 		return err
 	}
@@ -181,9 +181,8 @@ func writeBundle(zw *zip.Writer, l paths.Layout, man Manifest, selected []store.
 }
 
 // addGlobalToBundle packs the live opencode config/data dirs pointed at by the
-// global/ symlinks. Entries already managed by the shared base (skills, auth,
-// mcp-auth) and the session DB are skipped so the bundle stays small and the
-// shared/profile layers remain authoritative.
+// global/ symlinks. Shared/profile layers stay authoritative, and runtime state
+// stays local because it is large and machine/session-specific.
 func addGlobalToBundle(zw *zip.Writer, l paths.Layout, now time.Time, logw io.Writer) error {
 	cfg := l.GlobalConfigDir()
 	if data, err := os.ReadFile(l.GlobalOpencodeConfig()); err == nil {
@@ -192,20 +191,37 @@ func addGlobalToBundle(zw *zip.Writer, l paths.Layout, now time.Time, logw io.Wr
 		}
 	}
 	if err := addTreeDerefWithSkip(zw, cfg, globalPrefix+"config/opencode/", now, func(name string) bool {
-		return name == globalPrefix+"config/opencode/skills/" || strings.HasPrefix(name, globalPrefix+"config/opencode/skills/") || skipDependencyTree(name)
+		return name == globalPrefix+"config/opencode/skills/" ||
+			strings.HasPrefix(name, globalPrefix+"config/opencode/skills/") ||
+			skipDependencyTree(name) ||
+			skipBackup(name)
 	}); err != nil {
 		return err
 	}
 	data := l.GlobalDataDir()
 	if err := addTreeDerefWithSkip(zw, data, globalPrefix+"data/opencode/", now, func(name string) bool {
-		return name == globalPrefix+"data/opencode/opencode.db" ||
-			name == globalPrefix+"data/opencode/auth.json" ||
-			name == globalPrefix+"data/opencode/mcp-auth.json" ||
-			skipDependencyTree(name)
+		return skipGlobalData(name)
 	}); err != nil {
 		return err
 	}
 	return nil
+}
+
+func skipGlobalData(name string) bool {
+	base := globalPrefix + "data/opencode/"
+	rel := strings.TrimPrefix(name, base)
+	if rel == name {
+		return false
+	}
+	first, _, _ := strings.Cut(strings.Trim(rel, "/"), "/")
+	if first == "auth.json" || first == "mcp-auth.json" || strings.HasPrefix(first, "opencode.db") {
+		return true
+	}
+	switch first {
+	case "bin", "cache", "log", "logs", "snapshot", "storage", "tmp", "tool-output":
+		return true
+	}
+	return skipDependencyTree(name) || skipBackup(name)
 }
 
 func skipDependencyTree(name string) bool {
@@ -219,6 +235,10 @@ func skipDependencyTree(name string) bool {
 		}
 	}
 	return false
+}
+
+func skipBackup(name string) bool {
+	return strings.Contains(filepath.Base(name), ".bak-")
 }
 
 // selectProfiles resolves names to profiles, or returns all when names is empty.

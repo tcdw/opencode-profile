@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `ocp init` now creates `global/config/opencode` and `global/data/opencode` symlinks inside the store, pointing at the live opencode directories (`~/.config/opencode` and `~/.local/share/opencode`) so they can be edited directly from the store.
-- `ocp export`/`ocp import` now include the live/global opencode config and data directories in the bundle. Shared-managed entries (`skills/`, `auth.json`, `mcp-auth.json`) and the session DB (`opencode.db`) are excluded so the shared/profile layers remain authoritative and bundles stay small.
+- `ocp export`/`ocp import` now include the live/global opencode config and portable global data in the bundle. Shared-managed entries (`skills/`, `auth.json`, `mcp-auth.json`), session/runtime data (`opencode.db*`, `snapshot/`, `storage/`, `tool-output/`, `log/`, `bin/`), dependency trees, and `.bak` files are excluded so the shared/profile layers remain authoritative and bundles stay small.
 
 ## [0.7.0] - 2026-06-17
 

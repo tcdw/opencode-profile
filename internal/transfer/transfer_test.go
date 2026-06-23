@@ -58,9 +58,18 @@ func TestRoundTrip(t *testing.T) {
 	mustWrite(t, filepath.Join(liveCfgA, "opencode", "commands", "hello.json"), `{"cmd":"hi"}`)
 	mustWrite(t, filepath.Join(liveCfgA, "opencode", "plugins", "local.ts"), "export default async () => ({})\n")
 	mustWrite(t, filepath.Join(liveCfgA, "opencode", "plugins", "node_modules", "dep", "index.js"), "module.exports = {}\n")
+	mustWrite(t, filepath.Join(liveCfgA, "opencode", "opencode.json.bak-1"), `{"old":true}`)
 	mustWrite(t, filepath.Join(liveDataA, "opencode", "auth.json"), `{"openai":{"type":"oauth"}}`)
 	mustWrite(t, filepath.Join(liveDataA, "opencode", "mcp-auth.json"), `{"notion":{"token":"x"}}`)
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "opencode.db"), "db")
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "opencode.db-wal"), "wal")
 	mustWrite(t, filepath.Join(liveDataA, "opencode", "extensions", "foo.json"), `{"enabled":true}`)
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "snapshot", "project", "blob"), "snapshot")
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "storage", "message", "msg.json"), `{"large":true}`)
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "tool-output", "tool_1"), "output")
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "log", "app.log"), "log")
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "bin", "tool"), "bin")
+	mustWrite(t, filepath.Join(liveDataA, "opencode", "auth.json.bak-1"), `{"old":true}`)
 
 	lA := paths.Layout{Root: rootA}
 	sA, err := store.Open(lA)
@@ -204,6 +213,9 @@ func TestRoundTrip(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(liveCfgB, "opencode", "plugins", "node_modules")); !os.IsNotExist(err) {
 		t.Error("global plugin node_modules should not be imported")
 	}
+	if _, err := os.Stat(filepath.Join(liveCfgB, "opencode", "opencode.json.bak-1")); !os.IsNotExist(err) {
+		t.Error("global config backups should not be imported")
+	}
 	if got, _ := os.ReadFile(filepath.Join(liveDataB, "opencode", "extensions", "foo.json")); string(got) != `{"enabled":true}` {
 		t.Errorf("global extensions/foo.json = %q", got)
 	}
@@ -217,6 +229,19 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(liveDataB, "opencode", "opencode.db")); !os.IsNotExist(err) {
 		t.Error("global opencode.db should not be imported")
+	}
+	for _, rel := range []string{
+		"opencode.db-wal",
+		"snapshot",
+		"storage",
+		"tool-output",
+		"log",
+		"bin",
+		"auth.json.bak-1",
+	} {
+		if _, err := os.Stat(filepath.Join(liveDataB, "opencode", rel)); !os.IsNotExist(err) {
+			t.Errorf("global runtime data %s should not be imported", rel)
+		}
 	}
 }
 
