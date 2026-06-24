@@ -12,12 +12,17 @@ func runStartupSyncs(pairs []SyncPair) {
 	}
 }
 
-// runSyncs merges each Src JSON file into its Dst counterpart. Missing keys
-// in Dst that exist in Src are added; existing Dst keys are never overwritten.
+// runSyncs writes credentials back from the live XDG dir into the profile after
+// opencode exits. It overwrites so that tokens opencode refreshed mid-session
+// (e.g. an OAuth re-auth that mints a new access token) land in the profile;
+// without overwrite, a key the profile already held would be frozen at its old
+// value and every refresh would be silently discarded. This is safe because
+// runStartupSyncs already pushed the profile's values into live, so any key the
+// session did NOT touch still carries the profile's own value here.
 // Errors are silently ignored — sync is best-effort and must never block exit.
 func runSyncs(pairs []SyncPair) {
 	for _, p := range pairs {
-		mergeJSON(p.Src, p.Dst, false)
+		mergeJSON(p.Src, p.Dst, true)
 	}
 }
 

@@ -42,21 +42,33 @@ func TestRunStartupSyncsCreatesMissingLiveAuth(t *testing.T) {
 	}
 }
 
-func TestRunSyncsDoesNotOverwriteProfileCredentials(t *testing.T) {
+// runSyncs runs after opencode exits and must write back tokens the session
+// refreshed (e.g. an OAuth re-auth). Because runStartupSyncs already pushed the
+// profile's values into live, any key the session left untouched still carries
+// the profile's own value, so overwriting is safe — and necessary, or refreshed
+// credentials would be silently discarded on every subsequent launch.
+func TestRunSyncsWritesBackRefreshedCredentials(t *testing.T) {
 	tmp := t.TempDir()
 	live := filepath.Join(tmp, "live", "auth.json")
 	profile := filepath.Join(tmp, "profile", "auth.json")
-	mustWriteJSON(t, live, `{"openai":{"token":"live"},"google":{"token":"live-google"}}`)
-	mustWriteJSON(t, profile, `{"openai":{"token":"profile"}}`)
+	// live = post-session state: notion was re-authed to a fresh token, and the
+	// untouched openai key still mirrors what startup pushed up from the profile.
+	mustWriteJSON(t, live, `{"openai":{"token":"profile"},"notion":{"token":"refreshed"}}`)
+	// profile already held a now-expired notion token plus a key only it knows.
+	mustWriteJSON(t, profile, `{"openai":{"token":"profile"},"notion":{"token":"expired"},"glm":{"token":"profile-glm"}}`)
 
 	runSyncs([]SyncPair{{Src: live, Dst: profile}})
 
 	got := readProviders(t, profile)
+	if got["notion"]["token"] != "refreshed" {
+		t.Fatalf("notion token = %q, want refreshed", got["notion"]["token"])
+	}
 	if got["openai"]["token"] != "profile" {
 		t.Fatalf("openai token = %q, want profile", got["openai"]["token"])
 	}
-	if got["google"]["token"] != "live-google" {
-		t.Fatalf("google token = %q, want live-google", got["google"]["token"])
+	// A key the profile holds but live never saw must survive the write-back.
+	if got["glm"]["token"] != "profile-glm" {
+		t.Fatalf("glm token = %q, want profile-glm", got["glm"]["token"])
 	}
 }
 
